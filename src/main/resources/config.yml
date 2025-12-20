@@ -1,0 +1,52 @@
+max-shops-per-player: 64
+
+# Hard cap of shops attached to a single container (both halves of a double chest count as one).
+max-shops-per-container: 2
+one-owner-per-container: true
+
+market:
+  regions: []   # filled by /shopmarket set ...
+  outside-spacing-radius: 2
+
+
+allowed-containers:
+  - CHEST
+  - BARREL
+
+sign:
+  header: "[Shop]"                 # bare text, color applied dynamically
+  instock-color: "&a"              # green when at least one trade is possible
+  outstock-color: "&c"             # red when out of stock
+  show-stock-on-click: true
+  format-lines:
+    - "{header}"
+    - "&fOwner: &7{owner}"
+    - "&aPay: &f{cost_amt}x {cost_name}"
+    - "&eGet:  &f{sell_amt}x {sell_name}"
+
+gui:
+  create-title: "&2Create Item Shop"
+  purchase-title: "&6Buy from Shop"
+  search-title: "&6Shops for &e{query} &6({mode})"
+  edit-title: "&bEdit Shop"
+  trust-title: "&bTrusted Players"
+  bulktrust-title: "&bTrust {player} (click to toggle)"
+  glass-name: "&7 "
+  confirm-name: "&aConfirm"
+  cancel-name: "&cCancel"
+  save-name: "&aSave Changes"
+  delete-name: "&cDelete Shop"
+  buymax-name: "&eBuy Max"         # new
+
+safety:
+  match-exact-meta: true
+  deny-non-owner-break: true
+  require-attachment: true
+  block-hoppers: false
+
+  sign-update:
+    max-per-tick: 50      # how many containers to refresh per tick
+    period-ticks: 1       # run the refresh loop every tick
+
+storage:
+  file: "shops.yml"
