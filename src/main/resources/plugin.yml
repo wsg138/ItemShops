@@ -1,44 +1,44 @@
-name: ItemShops
-main: com.lincoln.itemshops.ItemShopsPlugin
-version: 1.1.1
-api-version: '1.20'
-author: Lincoln
-commands:
-  itemshops:
-    description: ItemShops commands
-    usage: /itemshops <reload|search|trust|untrust|list|edit|delete>
-    aliases: [shops, shop]   # added "shop" alias
-
-  shopvault:
-    description: Open your ItemShops profits vault
-    usage: /shopvault
-    aliases: [ vault, sv ]
-    permission: itemshops.vault
-
-    shopmarket:
-      description: Manage ItemShops market regions
-      usage: /shopmarket set <radius> | clear | list
-      permission: itemshops.market
-
-  shophelp:
-    description: Quick tutorial for ItemShops
-    usage: /shophelp
-    aliases: [ shoptutorial, shopguide, sht ]
-    permission: itemshops.help
-permissions:
-  itemshops.admin:
-    default: op
-  itemshops.break.others:
-    default: op
-  itemshops.maxshops.bypass:
-    default: op
-  itemshops.open.others:
-    default: op
-  itemshops.use:
-    default: true
-  itemshops.help:
-    default: true
-  itemshops.vault:
-    default: true
-  itemshops.market:
-    default: op
+name: ItemShops
+main: dev.enthusia.itemshops.ItemShopsPlugin
+version: 1.1.1
+api-version: '1.20'
+author: Enthusia
+commands:
+  itemshops:
+    description: ItemShops commands
+    usage: /itemshops <reload|search|trust|untrust|list|edit|delete>
+    aliases: [shops, shop]   # added "shop" alias
+
+  shopvault:
+    description: Open your ItemShops profits vault
+    usage: /shopvault
+    aliases: [ vault, sv ]
+    permission: itemshops.vault
+
+    shopmarket:
+      description: Manage ItemShops market regions
+      usage: /shopmarket set <radius> | clear | list
+      permission: itemshops.market
+
+  shophelp:
+    description: Quick tutorial for ItemShops
+    usage: /shophelp
+    aliases: [ shoptutorial, shopguide, sht ]
+    permission: itemshops.help
+permissions:
+  itemshops.admin:
+    default: op
+  itemshops.break.others:
+    default: op
+  itemshops.maxshops.bypass:
+    default: op
+  itemshops.open.others:
+    default: op
+  itemshops.use:
+    default: true
+  itemshops.help:
+    default: true
+  itemshops.vault:
+    default: true
+  itemshops.market:
+    default: op
