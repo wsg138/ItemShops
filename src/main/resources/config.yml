@@ -5,7 +5,7 @@ max-shops-per-container: 2
 one-owner-per-container: true
 
 market:
-  regions: []   # filled by /shopmarket set ...
+  regions: []   # filled by /shopmarket set ... or /shopmarket add ...
   outside-spacing-radius: 2
 
 

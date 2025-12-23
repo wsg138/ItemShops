@@ -22,6 +22,7 @@ errors:
   spacing-outside: "&cToo close to another shop. Outside the market, you must leave a 2-block gap."
   too-many-on-container: "&cThis container already has the maximum number of shops."
   self-purchase: "&eYou can't purchase from your own shop."
+  shop-frozen: "&cThis shop is currently frozen."
 info:
   created: "&aShop created! Stock the chest with your Give item."
   removed: "&eShop removed."
