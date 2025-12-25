@@ -1,9 +1,10 @@
-package dev.enthusia.itemshops;
-
+package dev.enthusia.itemshops;
+
 import dev.enthusia.itemshops.command.ItemShopsCommand;
 import dev.enthusia.itemshops.command.ShopHelpCommand;
 import dev.enthusia.itemshops.data.ShopStorage;
 import dev.enthusia.itemshops.gui.ChatAmountCapture;
+import dev.enthusia.itemshops.manager.GuildShopIntegration;
 import dev.enthusia.itemshops.listener.*;
 import dev.enthusia.itemshops.manager.ShopManager;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -14,20 +15,23 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ItemShopsPlugin extends JavaPlugin {
-
-    private static ItemShopsPlugin instance;
-
-    private ShopManager shopManager;
-    private ShopStorage storage;
-
-    private dev.enthusia.itemshops.vault.VaultManager vaultManager;
-    public dev.enthusia.itemshops.vault.VaultManager vault(){ return vaultManager; }
-
-
-    public static ItemShopsPlugin get() { return instance; }
-
+
+    private static ItemShopsPlugin instance;
+
+    private ShopManager shopManager;
+    private ShopStorage storage;
+
+    private dev.enthusia.itemshops.vault.VaultManager vaultManager;
+    public dev.enthusia.itemshops.vault.VaultManager vault(){ return vaultManager; }
+
+
+    public static ItemShopsPlugin get() { return instance; }
+
     private dev.enthusia.itemshops.region.MarketRegionManager marketManager;
     public dev.enthusia.itemshops.region.MarketRegionManager market(){ return marketManager; }
+
+    private GuildShopIntegration guildShopIntegration;
+    public GuildShopIntegration guildShops(){ return guildShopIntegration; }
 
     private final Map<UUID, Long> breakDeleteExpiry = new ConcurrentHashMap<>();
     private final java.util.Set<UUID> adminViewEnabled = ConcurrentHashMap.newKeySet();
@@ -36,42 +40,43 @@ public final class ItemShopsPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        instance = this;
-
-        saveDefaultConfig();
-        ensureConfigDefaults();
-        saveResource("messages.yml", false);
-        YamlLoader.mergeDefaults(this, "messages.yml");
-
-        storage = new ShopStorage(this);
-        shopManager = new ShopManager(this, storage);
-        shopManager.startSignUpdateScheduler();
-
-        
-        getServer().getPluginManager().registerEvents(new SignShopListener(this, shopManager), this);
-        getServer().getPluginManager().registerEvents(new BlockProtectionListener(this, shopManager), this);
-        getServer().getPluginManager().registerEvents(new MenuListener(), this);
-        getServer().getPluginManager().registerEvents(new ContainerStockListener(shopManager), this);
-        getServer().getPluginManager().registerEvents(new ContainerAccessListener(this, shopManager), this);
-        getServer().getPluginManager().registerEvents(new ExplodeCleanupListener(shopManager), this);
-        getServer().getPluginManager().registerEvents(new HopperControlListener(shopManager), this);
-        vaultManager = new dev.enthusia.itemshops.vault.VaultManager(this);
-        marketManager = new dev.enthusia.itemshops.region.MarketRegionManager(this);
-
-
-
-        
-        getServer().getPluginManager().registerEvents(new RecoveryListener(this, shopManager, storage), this);
-
-        
-        ChatAmountCapture.register(this);
-
-        
-        ItemShopsCommand mainCmd = new ItemShopsCommand(shopManager);
-        if (getCommand("itemshops") != null) {
-            getCommand("itemshops").setExecutor(mainCmd);
-            getCommand("itemshops").setTabCompleter(mainCmd);
-        }
+        instance = this;
+
+        saveDefaultConfig();
+        ensureConfigDefaults();
+        saveResource("messages.yml", false);
+        YamlLoader.mergeDefaults(this, "messages.yml");
+
+        storage = new ShopStorage(this);
+        shopManager = new ShopManager(this, storage);
+        shopManager.startSignUpdateScheduler();
+
+        
+        getServer().getPluginManager().registerEvents(new SignShopListener(this, shopManager), this);
+        getServer().getPluginManager().registerEvents(new BlockProtectionListener(this, shopManager), this);
+        getServer().getPluginManager().registerEvents(new MenuListener(), this);
+        getServer().getPluginManager().registerEvents(new ContainerStockListener(shopManager), this);
+        getServer().getPluginManager().registerEvents(new ContainerAccessListener(this, shopManager), this);
+        getServer().getPluginManager().registerEvents(new ExplodeCleanupListener(shopManager), this);
+        getServer().getPluginManager().registerEvents(new HopperControlListener(shopManager), this);
+        vaultManager = new dev.enthusia.itemshops.vault.VaultManager(this);
+        marketManager = new dev.enthusia.itemshops.region.MarketRegionManager(this);
+        guildShopIntegration = new GuildShopIntegration(this);
+
+
+
+        
+        getServer().getPluginManager().registerEvents(new RecoveryListener(this, shopManager, storage), this);
+
+        
+        ChatAmountCapture.register(this);
+
+        
+        ItemShopsCommand mainCmd = new ItemShopsCommand(shopManager);
+        if (getCommand("itemshops") != null) {
+            getCommand("itemshops").setExecutor(mainCmd);
+            getCommand("itemshops").setTabCompleter(mainCmd);
+        }
         ShopHelpCommand helpCmd = new ShopHelpCommand(this);
         if (getCommand("shophelp") != null) {
             getCommand("shophelp").setExecutor(helpCmd);
@@ -85,22 +90,22 @@ public final class ItemShopsPlugin extends JavaPlugin {
         if (getCommand("shopvault") != null) {
             getCommand("shopvault").setExecutor(vaultCmd);
             getCommand("shopvault").setTabCompleter(vaultCmd);
-        }
-        var marketCmd = new dev.enthusia.itemshops.command.MarketCommand(this);
-        if (getCommand("shopmarket") != null) {
-            getCommand("shopmarket").setExecutor(marketCmd);
-            getCommand("shopmarket").setTabCompleter(marketCmd);
-        }
-
-
-
-        
-        storage.loadAll(shopManager);
+        }
+        var marketCmd = new dev.enthusia.itemshops.command.MarketCommand(this);
+        if (getCommand("shopmarket") != null) {
+            getCommand("shopmarket").setExecutor(marketCmd);
+            getCommand("shopmarket").setTabCompleter(marketCmd);
+        }
+
+
+
+        
+        storage.loadAll(shopManager);
         int pruned = shopManager.pruneInvalidShops();
         getLogger().info("ItemShops enabled. Loaded " + shopManager.size() + " shops (pruned " + pruned + ").");
     }
-
-    @Override
+
+    @Override
     public void onDisable() {
         try { storage.saveAll(shopManager); }
         catch (Exception e) {
@@ -110,26 +115,26 @@ public final class ItemShopsPlugin extends JavaPlugin {
         if (vaultManager != null) vaultManager.saveNow();
         shopManager.stopSignUpdateScheduler();
     }
-
-    
-    public FileConfiguration messages() { return YamlLoader.get(this, "messages.yml"); }
-
-    
-    public ShopManager shops() { return shopManager; }
-
-    
-    public ShopStorage storage() { return storage; }
-
-    
-    private boolean ensureConfigDefaults() {
-        boolean changed = YamlLoader.mergeDefaults(this, "config.yml");
-        if (changed) {
-            getLogger().info("config.yml was missing entries; added defaults from the jar.");
-        }
-        return changed;
-    }
-
-    
+
+    
+    public FileConfiguration messages() { return YamlLoader.get(this, "messages.yml"); }
+
+    
+    public ShopManager shops() { return shopManager; }
+
+    
+    public ShopStorage storage() { return storage; }
+
+    
+    private boolean ensureConfigDefaults() {
+        boolean changed = YamlLoader.mergeDefaults(this, "config.yml");
+        if (changed) {
+            getLogger().info("config.yml was missing entries; added defaults from the jar.");
+        }
+        return changed;
+    }
+
+    
     public void reloadAll() {
         ensureConfigDefaults();
         reloadConfig();
@@ -140,7 +145,7 @@ public final class ItemShopsPlugin extends JavaPlugin {
 
         storage.saveAll(shopManager);
         storage.loadAll(shopManager);
-
+
         int pruned = shopManager.pruneInvalidShops();
         getLogger().info("Reload complete. Shops: " + shopManager.size() + " (pruned " + pruned + ").");
     }
