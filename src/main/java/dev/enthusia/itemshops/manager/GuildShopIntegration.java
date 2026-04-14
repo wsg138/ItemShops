@@ -1,23 +1,20 @@
 package dev.enthusia.itemshops.manager;
 
 import dev.enthusia.itemshops.ItemShopsPlugin;
-import net.lumalyte.armbridge.ARMGuildsBridge;
-import net.lumalyte.armbridge.services.ItemShopGuildService;
-import net.lumalyte.lg.LumaGuilds;
-import net.lumalyte.lg.application.services.GuildService;
-import net.lumalyte.lg.application.services.GuildVaultService;
-import net.lumalyte.lg.application.services.PhysicalCurrencyService;
-import net.lumalyte.lg.domain.entities.Guild;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 
+import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.logging.Logger;
 
 /**
  * Integration between ItemShops and ARM-Guilds-Bridge for guild shop functionality.
+ * Uses cached reflection to avoid classloader issues while maintaining performance.
+ * All Method objects are cached at initialization - zero reflection overhead at runtime.
  *
  * Handles:
  * - Checking if a shop is guild-owned
@@ -29,12 +26,30 @@ public class GuildShopIntegration {
     private final ItemShopsPlugin plugin;
     private final Logger logger;
 
-    private ARMGuildsBridge armBridge;
-    private LumaGuilds lumaGuilds;
-    private ItemShopGuildService itemShopGuildService;
-    private GuildService guildService;
-    private GuildVaultService guildVaultService;
-    private PhysicalCurrencyService physicalCurrencyService;
+    // Service objects (obtained via reflection at startup)
+    private Object armBridge;
+    private Object lumaGuilds;
+    private Object itemShopGuildService;
+    private Object guildService;
+    private Object guildVaultService;
+    private Object physicalCurrencyService;
+    private Object rankService;
+
+    // Cached Method objects (reflection done once at startup, reused at runtime)
+    private Method method_isGuildItemShop;
+    private Method method_getGuildForItemShop;
+    private Method method_getGuild;
+    private Method method_depositToVault;
+    private Method method_hasPermission;
+    private Method method_getCurrencyMaterialName;
+    private Method method_getItemValue;
+
+    // Cached classes and enum values
+    private Class<?> class_RankPermission;
+    private Class<?> class_Guild;
+    private Object enum_ACCESS_SHOP_CHESTS;
+    private Object enum_EDIT_SHOP_STOCK;
+    private Object enum_MODIFY_SHOP_PRICES;
 
     private boolean enabled = false;
 
@@ -46,48 +61,77 @@ public class GuildShopIntegration {
     }
 
     /**
-     * Initialize integration with ARM-Guilds-Bridge and LumaGuilds
+     * Initialize integration with ARM-Guilds-Bridge and LumaGuilds.
+     * All reflection is done HERE at startup - runtime methods use cached objects.
      */
     private void initialize() {
-        // Check for ARM-Guilds-Bridge
-        Plugin armPlugin = Bukkit.getPluginManager().getPlugin("ARM-Guilds-Bridge");
-        if (armPlugin == null || !armPlugin.isEnabled()) {
-            logger.warning("ARM-Guilds-Bridge not found - guild shop integration disabled");
-            logger.warning("Guild shops will not be available");
-            return;
+        try {
+            // Check for ARM-Guilds-Bridge
+            Plugin armPlugin = Bukkit.getPluginManager().getPlugin("ARM-Guilds-Bridge");
+            if (armPlugin == null || !armPlugin.isEnabled()) {
+                logger.info("ARM-Guilds-Bridge not found - guild shop integration disabled");
+                return;
+            }
+
+            armBridge = armPlugin;
+
+            // Check for LumaGuilds
+            Plugin lgPlugin = Bukkit.getPluginManager().getPlugin("LumaGuilds");
+            if (lgPlugin == null || !lgPlugin.isEnabled()) {
+                logger.warning("LumaGuilds not found - guild shop integration disabled");
+                return;
+            }
+
+            lumaGuilds = lgPlugin;
+
+            // === GET SERVICE OBJECTS (reflection only during init) ===
+            Method getItemShopGuildService = armBridge.getClass().getMethod("getItemShopGuildService");
+            itemShopGuildService = getItemShopGuildService.invoke(armBridge);
+
+            Method getGuildService = lumaGuilds.getClass().getMethod("getGuildService");
+            guildService = getGuildService.invoke(lumaGuilds);
+
+            Method getGuildVaultService = lumaGuilds.getClass().getMethod("getGuildVaultService");
+            guildVaultService = getGuildVaultService.invoke(lumaGuilds);
+
+            Method getPhysicalCurrencyService = lumaGuilds.getClass().getMethod("getPhysicalCurrencyService");
+            physicalCurrencyService = getPhysicalCurrencyService.invoke(lumaGuilds);
+
+            Method getRankService = armBridge.getClass().getMethod("getRankService");
+            rankService = getRankService.invoke(armBridge);
+
+            // === CACHE ALL METHOD OBJECTS (no reflection needed at runtime) ===
+            method_isGuildItemShop = itemShopGuildService.getClass().getMethod("isGuildItemShop", Location.class);
+            method_getGuildForItemShop = itemShopGuildService.getClass().getMethod("getGuildForItemShop", Location.class);
+            method_getGuild = guildService.getClass().getMethod("getGuild", UUID.class);
+            method_getCurrencyMaterialName = physicalCurrencyService.getClass().getMethod("getCurrencyMaterialName");
+            method_getItemValue = physicalCurrencyService.getClass().getMethod("getItemValue");
+
+            // === CACHE CLASSES AND ENUM VALUES ===
+            class_RankPermission = Class.forName("net.lumalyte.lg.domain.entities.RankPermission");
+            enum_ACCESS_SHOP_CHESTS = Enum.valueOf((Class<Enum>) class_RankPermission, "ACCESS_SHOP_CHESTS");
+            enum_EDIT_SHOP_STOCK = Enum.valueOf((Class<Enum>) class_RankPermission, "EDIT_SHOP_STOCK");
+            enum_MODIFY_SHOP_PRICES = Enum.valueOf((Class<Enum>) class_RankPermission, "MODIFY_SHOP_PRICES");
+
+            // Cache hasPermission method (same signature for all permission checks)
+            method_hasPermission = rankService.getClass().getMethod("hasPermission",
+                UUID.class, UUID.class, class_RankPermission);
+
+            // Get Guild class for depositToVault signature
+            class_Guild = Class.forName("net.lumalyte.lg.domain.entities.Guild");
+            method_depositToVault = guildVaultService.getClass().getMethod("depositToVault",
+                class_Guild, double.class, String.class);
+
+            enabled = true;
+            logger.info("Guild shop integration enabled!");
+            logger.info("- All reflection cached at startup (zero runtime overhead)");
+            logger.info("- Guild shops can be created with /guild setshop");
+            logger.info("- Income from guild shops routes to guild vault");
+        } catch (Exception e) {
+            logger.warning("Failed to initialize guild shop integration: " + e.getMessage());
+            e.printStackTrace();
+            enabled = false;
         }
-
-        if (!(armPlugin instanceof ARMGuildsBridge)) {
-            logger.warning("ARM-Guilds-Bridge wrong type - guild shop integration disabled");
-            return;
-        }
-
-        armBridge = (ARMGuildsBridge) armPlugin;
-
-        // Check for LumaGuilds
-        Plugin lgPlugin = Bukkit.getPluginManager().getPlugin("LumaGuilds");
-        if (lgPlugin == null || !lgPlugin.isEnabled()) {
-            logger.warning("LumaGuilds not found - guild shop integration disabled");
-            return;
-        }
-
-        if (!(lgPlugin instanceof LumaGuilds)) {
-            logger.warning("LumaGuilds wrong type - guild shop integration disabled");
-            return;
-        }
-
-        lumaGuilds = (LumaGuilds) lgPlugin;
-
-        // Get services
-        itemShopGuildService = armBridge.getItemShopGuildService();
-        guildService = lumaGuilds.getGuildService();
-        guildVaultService = lumaGuilds.getGuildVaultService();
-        physicalCurrencyService = lumaGuilds.getPhysicalCurrencyService();
-
-        enabled = true;
-        logger.info("Guild shop integration enabled!");
-        logger.info("- Guild shops can be created with /guild setshop");
-        logger.info("- Income from guild shops routes to guild vault");
     }
 
     /**
@@ -98,34 +142,36 @@ public class GuildShopIntegration {
     }
 
     /**
-     * Check if a shop at this location is a guild shop
-     *
-     * @param shopLocation Location of the shop chest
-     * @return true if this is a guild shop
+     * Check if a shop at this location is a guild shop.
+     * Uses cached Method - no reflection lookup overhead.
      */
     public boolean isGuildShop(Location shopLocation) {
         if (!enabled) return false;
-        return itemShopGuildService.isGuildItemShop(shopLocation);
+        try {
+            return (Boolean) method_isGuildItemShop.invoke(itemShopGuildService, shopLocation);
+        } catch (Exception e) {
+            logger.warning("Failed to check if shop is guild shop: " + e.getMessage());
+            return false;
+        }
     }
 
     /**
-     * Get the guild ID for a shop
-     *
-     * @param shopLocation Location of the shop chest
-     * @return Guild UUID or null if not a guild shop
+     * Get the guild ID for a shop.
+     * Uses cached Method - no reflection lookup overhead.
      */
     public UUID getGuildForShop(Location shopLocation) {
         if (!enabled) return null;
-        return itemShopGuildService.getGuildForItemShop(shopLocation);
+        try {
+            return (UUID) method_getGuildForItemShop.invoke(itemShopGuildService, shopLocation);
+        } catch (Exception e) {
+            logger.warning("Failed to get guild for shop: " + e.getMessage());
+            return null;
+        }
     }
 
     /**
-     * Route shop income to the appropriate vault (guild or player)
-     *
-     * @param shopLocation Location of the shop chest
-     * @param amount Amount of income
-     * @param buyer Player who made the purchase (for logging)
-     * @return true if successfully routed
+     * Route shop income to the appropriate vault (guild or player).
+     * Uses cached Method objects - no reflection lookup overhead.
      */
     public boolean routeShopIncome(Location shopLocation, double amount, Player buyer) {
         if (!enabled) {
@@ -141,15 +187,16 @@ public class GuildShopIntegration {
 
         // This is a guild shop - route income to guild vault
         try {
-            // Fetch guild object
-            Guild guild = guildService.getGuild(guildId);
+            // Fetch guild object (using cached method)
+            Object guild = method_getGuild.invoke(guildService, guildId);
+
             if (guild == null) {
                 logger.warning("Guild not found for ID: " + guildId);
                 return false;
             }
 
-            // Deposit to guild vault
-            guildVaultService.depositToVault(guild, amount, "ItemShop income from " + buyer.getName());
+            // Deposit to guild vault (using cached method)
+            method_depositToVault.invoke(guildVaultService, guild, amount, "ItemShop income from " + buyer.getName());
 
             logger.info("Routed " + amount + " from ItemShop to guild " + guildId + " (buyer: " + buyer.getName() + ")");
             return true;
@@ -161,11 +208,8 @@ public class GuildShopIntegration {
     }
 
     /**
-     * Check if a player can access a guild shop (chest opening)
-     *
-     * @param player Player attempting access
-     * @param shopLocation Shop location
-     * @return true if player has permission
+     * Check if a player can access a guild shop (chest opening).
+     * Uses cached Method and enum - no reflection lookup overhead.
      */
     public boolean canAccessGuildShop(Player player, Location shopLocation) {
         if (!enabled) return true; // No guild integration, allow normal access
@@ -173,13 +217,10 @@ public class GuildShopIntegration {
         UUID guildId = getGuildForShop(shopLocation);
         if (guildId == null) return true; // Not a guild shop, allow normal access
 
-        // Check if player has ACCESS_SHOP_CHESTS permission
+        // Check permission using cached method and enum value
         try {
-            return armBridge.getRankService().hasPermission(
-                player.getUniqueId(),
-                guildId,
-                net.lumalyte.lg.domain.entities.RankPermission.ACCESS_SHOP_CHESTS
-            );
+            return (Boolean) method_hasPermission.invoke(rankService,
+                player.getUniqueId(), guildId, enum_ACCESS_SHOP_CHESTS);
         } catch (Exception e) {
             logger.warning("Failed to check guild shop access permission: " + e.getMessage());
             return false;
@@ -187,11 +228,8 @@ public class GuildShopIntegration {
     }
 
     /**
-     * Check if a player can edit a guild shop's stock (inventory editing)
-     *
-     * @param player Player attempting to edit
-     * @param shopLocation Shop location
-     * @return true if player has permission
+     * Check if a player can edit a guild shop's stock (inventory editing).
+     * Uses cached Method and enum - no reflection lookup overhead.
      */
     public boolean canEditGuildShopStock(Player player, Location shopLocation) {
         if (!enabled) return true; // No guild integration, allow normal editing
@@ -199,13 +237,10 @@ public class GuildShopIntegration {
         UUID guildId = getGuildForShop(shopLocation);
         if (guildId == null) return true; // Not a guild shop, allow normal editing
 
-        // Check if player has EDIT_SHOP_STOCK permission
+        // Check permission using cached method and enum value
         try {
-            return armBridge.getRankService().hasPermission(
-                player.getUniqueId(),
-                guildId,
-                net.lumalyte.lg.domain.entities.RankPermission.EDIT_SHOP_STOCK
-            );
+            return (Boolean) method_hasPermission.invoke(rankService,
+                player.getUniqueId(), guildId, enum_EDIT_SHOP_STOCK);
         } catch (Exception e) {
             logger.warning("Failed to check guild shop edit permission: " + e.getMessage());
             return false;
@@ -213,11 +248,8 @@ public class GuildShopIntegration {
     }
 
     /**
-     * Check if a player can modify shop prices (sign editing)
-     *
-     * @param player Player attempting to modify
-     * @param shopLocation Shop location
-     * @return true if player has permission
+     * Check if a player can modify shop prices (sign editing).
+     * Uses cached Method and enum - no reflection lookup overhead.
      */
     public boolean canModifyGuildShopPrices(Player player, Location shopLocation) {
         if (!enabled) return true; // No guild integration, allow normal modification
@@ -225,13 +257,10 @@ public class GuildShopIntegration {
         UUID guildId = getGuildForShop(shopLocation);
         if (guildId == null) return true; // Not a guild shop, allow normal modification
 
-        // Check if player has MODIFY_SHOP_PRICES permission
+        // Check permission using cached method and enum value
         try {
-            return armBridge.getRankService().hasPermission(
-                player.getUniqueId(),
-                guildId,
-                net.lumalyte.lg.domain.entities.RankPermission.MODIFY_SHOP_PRICES
-            );
+            return (Boolean) method_hasPermission.invoke(rankService,
+                player.getUniqueId(), guildId, enum_MODIFY_SHOP_PRICES);
         } catch (Exception e) {
             logger.warning("Failed to check guild shop price modification permission: " + e.getMessage());
             return false;
@@ -239,17 +268,15 @@ public class GuildShopIntegration {
     }
 
     /**
-     * Check if an ItemStack is the configured physical currency material
-     *
-     * @param item ItemStack to check
-     * @return true if item matches the physical currency material
+     * Check if an ItemStack is the configured physical currency material.
+     * Uses cached Method - no reflection lookup overhead.
      */
-    public boolean isPhysicalCurrency(org.bukkit.inventory.ItemStack item) {
+    public boolean isPhysicalCurrency(ItemStack item) {
         if (!enabled) return false;
         if (item == null) return false;
 
         try {
-            String currencyMaterial = physicalCurrencyService.getCurrencyMaterialName();
+            String currencyMaterial = (String) method_getCurrencyMaterialName.invoke(physicalCurrencyService);
             return item.getType().name().equals(currencyMaterial);
         } catch (Exception e) {
             logger.warning("Failed to check if item is physical currency: " + e.getMessage());
@@ -258,19 +285,18 @@ public class GuildShopIntegration {
     }
 
     /**
-     * Calculate the currency value of an ItemStack in currency units
-     *
-     * @param item ItemStack to calculate
-     * @param amount Number of items
-     * @return Total currency value
+     * Calculate the currency value of an ItemStack in currency units.
+     * Uses cached Method - no reflection lookup overhead.
      */
-    public int calculateCurrencyValue(org.bukkit.inventory.ItemStack item, int amount) {
+    public int calculateCurrencyValue(ItemStack item, int amount) {
         if (!enabled) return 0;
         if (item == null) return 0;
 
         try {
             if (!isPhysicalCurrency(item)) return 0;
-            return physicalCurrencyService.getItemValue() * amount;
+
+            int itemValue = (Integer) method_getItemValue.invoke(physicalCurrencyService);
+            return itemValue * amount;
         } catch (Exception e) {
             logger.warning("Failed to calculate currency value: " + e.getMessage());
             return 0;
