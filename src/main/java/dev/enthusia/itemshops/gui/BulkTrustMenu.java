@@ -67,7 +67,7 @@ public final class BulkTrustMenu implements ShopMenu {
     }
 
     private boolean isTrusted(Shop s){ return s.trusted().contains(target); }
-    private void setTrusted(Shop s, boolean v){ if (v) s.addTrusted(target); else s.removeTrusted(target); }
+    private void setTrusted(Shop s, boolean v){ mgr.setTrusted(s, target, v); }
 
     private void render(){
         mgr.pruneInvalidShops();
@@ -118,8 +118,7 @@ public final class BulkTrustMenu implements ShopMenu {
             if (raw == TOGGLE_ALL) {
                 long trustedCount = shops.stream().filter(this::isTrusted).count();
                 boolean trust = trustedCount < (shops.size()/2.0);
-                for (Shop s : shops) { setTrusted(s, trust); ItemShopsPlugin.get().shops().updateSign(s); }
-                mgr.requestSave();
+                mgr.setTrusted(shops, target, trust);
                 owner.sendMessage(ItemUtils.colored("&a"+(trust ? "Trusted " : "Untrusted ")+targetName+" for all your shops."));
                 render();
                 return true;
@@ -129,8 +128,6 @@ public final class BulkTrustMenu implements ShopMenu {
                 Shop s = shops.get(idx);
                 boolean now = !isTrusted(s);
                 setTrusted(s, now);
-                ItemShopsPlugin.get().shops().updateSign(s);
-                mgr.requestSave();
                 render();
                 return true;
             }

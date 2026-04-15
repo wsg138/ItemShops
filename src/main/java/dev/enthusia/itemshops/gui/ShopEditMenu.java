@@ -209,9 +209,9 @@ public final class ShopEditMenu implements ShopMenu {
         
         e.setCancelled(true);
 
-        if (raw == HOP_IN_SLOT)  { shop.setHopperAllowIn(!shop.isHopperAllowIn());  mgr.requestSave(); render(); return true; }
-        if (raw == HOP_OUT_SLOT) { shop.setHopperAllowOut(!shop.isHopperAllowOut()); mgr.requestSave(); render(); return true; }
-        if (raw == SEARCH_SLOT)  { shop.setSearchEnabled(!shop.isSearchEnabled());   mgr.requestSave(); render(); return true; }
+        if (raw == HOP_IN_SLOT)  { mgr.setHopperAllowIn(shop, !shop.isHopperAllowIn()); render(); return true; }
+        if (raw == HOP_OUT_SLOT) { mgr.setHopperAllowOut(shop, !shop.isHopperAllowOut()); render(); return true; }
+        if (raw == SEARCH_SLOT)  { mgr.setSearchEnabled(shop, !shop.isSearchEnabled()); render(); return true; }
 
         if (raw == SAVE_SLOT) {
             if (!allowTemplateEdit) {
@@ -225,10 +225,7 @@ public final class ShopEditMenu implements ShopMenu {
                 owner.sendMessage(Texts.msg(plugin.messages(), "errors.nothing-to-confirm"));
                 return true;
             }
-            shop.setSell(sell.clone());
-            shop.setCost(cost.clone());
-            plugin.shops().updateSign(shop);
-            mgr.requestSave();
+            mgr.updateTradeItems(shop, sell, cost);
             owner.sendMessage(ItemUtils.colored("&aShop updated."));
             owner.closeInventory();
             return true;

@@ -111,8 +111,7 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
             String mode = args.length >=3 ? args[2].toLowerCase(Locale.ROOT) : "menu";
             if ("all".equals(mode)) {
                 var list = mgr.ownedBy(p.getUniqueId());
-                for (var s : list) { s.addTrusted(op.getUniqueId()); ItemShopsPlugin.get().shops().updateSign(s); }
-                ItemShopsPlugin.get().shops().requestSave();
+                mgr.setTrusted(list, op.getUniqueId(), true);
                 sender.sendMessage(ItemUtils.colored("&aTrusted &f"+name+"&a for all your shops."));
                 return true;
             }
@@ -128,8 +127,7 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
             if (op == null || (op.getName()==null && !op.hasPlayedBefore())) { sender.sendMessage(ItemUtils.colored("&cUnknown player.")); return true; }
             if (args.length >=3 && "all".equalsIgnoreCase(args[2])) {
                 var list = mgr.ownedBy(p.getUniqueId());
-                for (var s : list) { s.removeTrusted(op.getUniqueId()); ItemShopsPlugin.get().shops().updateSign(s); }
-                ItemShopsPlugin.get().shops().requestSave();
+                mgr.setTrusted(list, op.getUniqueId(), false);
                 sender.sendMessage(ItemUtils.colored("&eUntrusted &f"+name+"&e for all your shops."));
                 return true;
             }
@@ -311,11 +309,8 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
             if (args.length < 2) { sender.sendMessage(ItemUtils.colored("&eUsage: /itemshops freeze <player|all|menu> [duration]")); return true; }
             long durationMs = args.length >= 3 ? parseDurationMs(args[2], 0L) : 0L;
             if ("all".equalsIgnoreCase(args[1])) {
-                for (Shop s : mgr.all()) {
-                    if (durationMs > 0) s.freezeUntil(System.currentTimeMillis() + durationMs);
-                    else s.freezeIndefinitely();
-                }
-                mgr.requestSave();
+                long untilMs = durationMs > 0 ? System.currentTimeMillis() + durationMs : 0L;
+                mgr.freezeShops(mgr.all(), untilMs);
                 sender.sendMessage(ItemUtils.colored("&eFroze all shops."));
                 return true;
             }
@@ -329,11 +324,8 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
             }
             OfflinePlayer op = Bukkit.getOfflinePlayer(args[1]);
             if (op == null || (op.getName()==null && !op.hasPlayedBefore())) { sender.sendMessage(ItemUtils.colored("&cUnknown player.")); return true; }
-            for (Shop s : mgr.ownedBy(op.getUniqueId())) {
-                if (durationMs > 0) s.freezeUntil(System.currentTimeMillis() + durationMs);
-                else s.freezeIndefinitely();
-            }
-            mgr.requestSave();
+            long untilMs = durationMs > 0 ? System.currentTimeMillis() + durationMs : 0L;
+            mgr.freezeShops(mgr.ownedBy(op.getUniqueId()), untilMs);
             sender.sendMessage(ItemUtils.colored("&eFroze shops for &f" + op.getName() + "&e."));
             return true;
         }
@@ -346,8 +338,7 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
             }
             if (args.length < 2) { sender.sendMessage(ItemUtils.colored("&eUsage: /itemshops unfreeze <player|all|menu>")); return true; }
             if ("all".equalsIgnoreCase(args[1])) {
-                for (Shop s : mgr.all()) s.unfreeze();
-                mgr.requestSave();
+                mgr.unfreezeShops(mgr.all());
                 sender.sendMessage(ItemUtils.colored("&eUnfroze all shops."));
                 return true;
             }
@@ -360,8 +351,7 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
             }
             OfflinePlayer op = Bukkit.getOfflinePlayer(args[1]);
             if (op == null || (op.getName()==null && !op.hasPlayedBefore())) { sender.sendMessage(ItemUtils.colored("&cUnknown player.")); return true; }
-            for (Shop s : mgr.ownedBy(op.getUniqueId())) s.unfreeze();
-            mgr.requestSave();
+            mgr.unfreezeShops(mgr.ownedBy(op.getUniqueId()));
             sender.sendMessage(ItemUtils.colored("&eUnfroze shops for &f" + op.getName() + "&e."));
             return true;
         }

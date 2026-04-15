@@ -1,22 +1,35 @@
+# ItemShops production config
+#
+# Notes:
+# - Shops inside a configured market region default to being searchable.
+# - Shops outside market regions default to hidden from search, but owners can toggle search on in the edit menu.
+# - Outside a market region, shops must respect the configured container spacing rule.
+# - Double chests count as one container for spacing and shop-limit checks.
+
 max-shops-per-player: 64
 
-# Hard cap of shops attached to a single container (both halves of a double chest count as one).
+# Maximum number of shop signs that may be linked to one unified container.
 max-shops-per-container: 2
+
+# When true, all shops on the same container must belong to the same owner.
 one-owner-per-container: true
 
 market:
-  regions: []   # filled by /shopmarket set ... or /shopmarket add ...
-  outside-spacing-radius: 2
+  # Regions are managed through /shopmarket.
+  regions: []
 
+  # Outside market regions, another shop container may not exist within this many blocks
+  # using a Chebyshev-style cube distance. A value of 1 means you need a one-block air gap.
+  outside-spacing-radius: 1
 
 allowed-containers:
   - CHEST
   - BARREL
 
 sign:
-  header: "[Shop]"                 # bare text, color applied dynamically
-  instock-color: "&a"              # green when at least one trade is possible
-  outstock-color: "&c"             # red when out of stock
+  header: "[Shop]"
+  instock-color: "&a"
+  outstock-color: "&c"
   show-stock-on-click: true
   format-lines:
     - "{header}"
@@ -36,17 +49,35 @@ gui:
   cancel-name: "&cCancel"
   save-name: "&aSave Changes"
   delete-name: "&cDelete Shop"
-  buymax-name: "&eBuy Max"         # new
+  buymax-name: "&eBuy Max"
+
+hoppers:
+  # Default values used when a shop is first created or when old data is missing hopper flags.
+  default-allow-in: false
+  default-allow-out: false
+
+sign-update:
+  # Max number of containers/sign groups to refresh in one scheduled pass.
+  batch-per-run: 200
+
+  # Delay between refresh passes. 1 tick keeps stock signs responsive without forcing
+  # all sign work into the exact same event that changed the inventory.
+  run-delay-ticks: 1
 
 safety:
+  # Retained for compatibility with existing configs and future checks.
   match-exact-meta: true
   deny-non-owner-break: true
   require-attachment: true
   block-hoppers: false
 
+  # Legacy fallback path. The runtime prefers the top-level sign-update section above.
   sign-update:
-    max-per-tick: 50      # how many containers to refresh per tick
-    period-ticks: 1       # run the refresh loop every tick
+    max-per-tick: 200
+    period-ticks: 1
 
 storage:
   file: "shops.yml"
+
+debug:
+  removals: true

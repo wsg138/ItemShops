@@ -109,27 +109,31 @@ public final class VaultMenu implements ShopMenu {
             if (idx >= entries.size()) return true;
             VaultEntry ve = entries.get(idx);
 
-            if (e.getClick().isRightClick()) {
-                
-                int toGive = Math.min(ve.amount, ItemUtils.capacityTrades(player.getInventory(), ve.item, ve.amount));
-                if (toGive > 0) {
-                    ItemUtils.addExact(player.getInventory(), ve.item, toGive);
-                    vm.withdraw(player.getUniqueId(), idx, toGive);
-                    reload();
-                }
-                return true;
-            } else {
-                
-                int stack = ve.item.getMaxStackSize();
-                int toGive = Math.min(stack, ve.amount);
-                toGive = Math.min(toGive, ItemUtils.capacityTrades(player.getInventory(), ve.item, toGive));
-                if (toGive > 0) {
-                    ItemUtils.addExact(player.getInventory(), ve.item, toGive);
-                    vm.withdraw(player.getUniqueId(), idx, toGive);
-                    reload();
-                }
-                return true;
-            }
+            if (e.getClick().isRightClick()) {
+                
+                int toGive = Math.min(ve.amount, ItemUtils.capacityTrades(player.getInventory(), ve.item, ve.amount));
+                if (toGive > 0) {
+                    int taken = vm.withdraw(player.getUniqueId(), idx, toGive);
+                    if (taken > 0) {
+                        ItemUtils.addExact(player.getInventory(), ve.item, taken);
+                        reload();
+                    }
+                }
+                return true;
+            } else {
+                
+                int stack = ve.item.getMaxStackSize();
+                int toGive = Math.min(stack, ve.amount);
+                toGive = Math.min(toGive, ItemUtils.capacityTrades(player.getInventory(), ve.item, toGive));
+                if (toGive > 0) {
+                    int taken = vm.withdraw(player.getUniqueId(), idx, toGive);
+                    if (taken > 0) {
+                        ItemUtils.addExact(player.getInventory(), ve.item, taken);
+                        reload();
+                    }
+                }
+                return true;
+            }
         }
         return true;
     }

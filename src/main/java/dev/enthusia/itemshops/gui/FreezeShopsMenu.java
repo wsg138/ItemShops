@@ -125,13 +125,11 @@ public final class FreezeShopsMenu implements ShopMenu {
                 int idx = page*PER_PAGE + raw; if (idx >= shops.size()) return true;
                 Shop s = shops.get(idx);
                 if (s.isFrozen()) {
-                    s.unfreeze();
-                    mgr.requestSave();
+                    mgr.unfreezeShop(s);
                     viewer.sendMessage(ItemUtils.colored("&eUnfroze shop."));
                 } else {
-                    if (durationMs > 0) s.freezeUntil(System.currentTimeMillis() + durationMs);
-                    else s.freezeIndefinitely();
-                    mgr.requestSave();
+                    long untilMs = durationMs > 0 ? System.currentTimeMillis() + durationMs : 0L;
+                    mgr.freezeShop(s, untilMs);
                     viewer.sendMessage(ItemUtils.colored("&eFroze shop."));
                 }
                 render();

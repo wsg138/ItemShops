@@ -58,10 +58,16 @@ public final class SignShopListener implements Listener {
                 e.setCancelled(true);
                 boolean isOwner = p.getUniqueId().equals(shop.owner()) || p.hasPermission("itemshops.admin");
                 boolean isTrusted = shop.trusted().contains(p.getUniqueId());
+                boolean isGuild = plugin.guildShops() != null
+                        && plugin.guildShops().isEnabled()
+                        && shop.container().toLocation() != null
+                        && plugin.guildShops().isGuildShop(shop.container().toLocation());
                 if (isOwner) {
-                    new ShopEditMenu(plugin, mgr, p, shop, true, true).open();
+                    new ShopEditMenu(plugin, mgr, p, shop, true, !isGuild).open();
                 } else if (isTrusted) {
                     new ShopEditMenu(plugin, mgr, p, shop, false, false).open();
+                } else if (isGuild && plugin.guildShops().canModifyGuildShopPrices(p, shop.container().toLocation())) {
+                    new ShopEditMenu(plugin, mgr, p, shop, true, false).open();
                 } else {
                     p.sendMessage(Texts.msg(plugin.messages(), "errors.not-owner"));
                 }
@@ -79,23 +85,18 @@ public final class SignShopListener implements Listener {
             }
             if (!mgr.canCreate(p)) {
                 e.setCancelled(true);
-                p.sendMessage(Texts.fmt(plugin.messages(), "errors.max-shops", "max", plugin.getConfig().getInt("max-shops-per-player")));
+                p.sendMessage(Texts.fmt(plugin.messages(), "errors.max-shops", "max", plugin.pluginConfig().maxShopsPerPlayer()));
                 return;
             }
             Pos uni = mgr.unifyContainerPos(container);
-            List<Shop> onThis = mgr.shopsOn(uni);
-            int limit = plugin.getConfig().getInt("max-shops-per-container", 2);
-            if (!onThis.isEmpty()) {
-                boolean otherOwner = onThis.stream().anyMatch(s -> !s.owner().equals(p.getUniqueId()));
-                if (plugin.getConfig().getBoolean("one-owner-per-container", true) && otherOwner) {
-                    e.setCancelled(true);
-                    p.sendMessage(Texts.msg(plugin.messages(), "errors.container-claimed"));
-                    return;
-                }
-            }
-            if (onThis.size() >= limit) {
+            String placementError = mgr.validatePlacement(p, uni);
+            if (placementError != null) {
                 e.setCancelled(true);
-                p.sendMessage(Texts.fmt(plugin.messages(), "errors.container-shop-limit", "limit", limit));
+                if ("errors.container-shop-limit".equals(placementError)) {
+                    p.sendMessage(Texts.fmt(plugin.messages(), placementError, "limit", plugin.pluginConfig().maxShopsPerContainer()));
+                } else {
+                    p.sendMessage(Texts.msg(plugin.messages(), placementError));
+                }
                 return;
             }
 

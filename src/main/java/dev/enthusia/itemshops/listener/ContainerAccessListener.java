@@ -32,22 +32,23 @@ public final class ContainerAccessListener implements Listener {
 
     
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onInteract(PlayerInteractEvent e) {
-        if (e.getClickedBlock() == null) return;
-        Block b = e.getClickedBlock();
-        if (!(b.getState() instanceof Container)) return;
+    public void onInteract(PlayerInteractEvent e) {
+        if (e.getClickedBlock() == null) return;
+        Block b = e.getClickedBlock();
+        if (!(b.getState() instanceof Container)) return;
 
         
         Pos uni = mgr.unifyContainerPos(b);
-        List<Shop> shops = mgr.shopsOn(uni);
-        if (shops.isEmpty()) return;
-
-        Player p = e.getPlayer();
-        if (canOpen(p.getUniqueId(), shops, p.hasPermission("itemshops.open.others"))) return;
-
-        e.setCancelled(true);
-        p.sendMessage(Texts.msg(plugin.messages(), "errors.not-owner"));
-    }
+        List<Shop> shops = mgr.shopsOn(uni);
+        if (shops.isEmpty()) return;
+
+        Player p = e.getPlayer();
+        if (isGuildAllowed(p, shops, b)) return;
+        if (canOpen(p.getUniqueId(), shops, p.hasPermission("itemshops.open.others"))) return;
+
+        e.setCancelled(true);
+        p.sendMessage(Texts.msg(plugin.messages(), "errors.not-owner"));
+    }
 
     
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -66,15 +67,26 @@ public final class ContainerAccessListener implements Listener {
         if (block == null) return;
 
         Pos uni = mgr.unifyContainerPos(block);
-        List<Shop> shops = mgr.shopsOn(uni);
-        if (shops.isEmpty()) return;
-
-        Player p = (Player) e.getPlayer();
-        if (canOpen(p.getUniqueId(), shops, p.hasPermission("itemshops.open.others"))) return;
-
-        e.setCancelled(true);
-        p.sendMessage(Texts.msg(plugin.messages(), "errors.not-owner"));
-    }
+        List<Shop> shops = mgr.shopsOn(uni);
+        if (shops.isEmpty()) return;
+
+        Player p = (Player) e.getPlayer();
+        if (isGuildAllowed(p, shops, block)) return;
+        if (canOpen(p.getUniqueId(), shops, p.hasPermission("itemshops.open.others"))) return;
+
+        e.setCancelled(true);
+        p.sendMessage(Texts.msg(plugin.messages(), "errors.not-owner"));
+    }
+
+    private boolean isGuildAllowed(Player player, List<Shop> shops, Block block) {
+        if (player == null || shops == null || shops.isEmpty()) return false;
+        if (plugin.guildShops() == null || !plugin.guildShops().isEnabled()) return false;
+        if (block == null) return false;
+        if (!plugin.guildShops().isGuildShop(block.getLocation())) return false;
+        return plugin.guildShops().canAccessGuildShop(player, block.getLocation())
+                || plugin.guildShops().canEditGuildShopStock(player, block.getLocation())
+                || shops.stream().anyMatch(s -> s.owner().equals(player.getUniqueId()) || s.trusted().contains(player.getUniqueId()));
+    }
 
     private boolean canOpen(UUID player, List<Shop> onContainer, boolean hasBypass) {
         if (hasBypass) return true;

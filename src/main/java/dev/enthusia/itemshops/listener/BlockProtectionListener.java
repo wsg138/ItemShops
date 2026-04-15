@@ -51,6 +51,15 @@ public final class BlockProtectionListener implements Listener {
             Pos uni = mgr.unifyContainerPos(b);
             var shops = mgr.shopsOn(uni);
             if (!shops.isEmpty()) {
+                if (plugin.guildShops() != null && plugin.guildShops().isEnabled()
+                        && plugin.guildShops().isGuildShop(b.getLocation())
+                        && !p.hasPermission("itemshops.admin")
+                        && !plugin.isBreakOthersActive(p.getUniqueId())
+                        && !p.hasPermission("itemshops.break.others")) {
+                    e.setCancelled(true);
+                    p.sendMessage(Texts.msg(plugin.messages(), "errors.not-owner"));
+                    return;
+                }
                 boolean canBreak = p.hasPermission("itemshops.break.others")
                         || plugin.isBreakOthersActive(p.getUniqueId())
                         || shops.stream().allMatch(s -> s.owner().equals(p.getUniqueId()));

@@ -1,33 +1,38 @@
-name: ItemShops
-main: dev.enthusia.itemshops.ItemShopsPlugin
-version: 1.1.1
-api-version: '1.20'
+name: ItemShops
+main: dev.enthusia.itemshops.ItemShopsPlugin
+version: 1.1.1
+api-version: '1.21'
+softdepend: [ARM-Guilds-Bridge, LumaGuilds, WorldGuard, Vault]
 author: Enthusia
-commands:
+
+commands:
   itemshops:
     description: ItemShops commands
     usage: /itemshops <reload|search|trust|untrust|list|edit|delete|breakdelete|adminview|info|breakothers|remove|teleport|fix|freeze|unfreeze|vault>
-    aliases: [shops, shop]   # added "shop" alias
-
+    aliases: [shops, shop]
+
   shopvault:
     description: Open your ItemShops profits vault
     usage: /shopvault
-    aliases: [ vault, sv ]
+    aliases: [vault, sv]
     permission: itemshops.vault
+
   shopmarket:
     description: Manage ItemShops market regions
     usage: /shopmarket set <radius> | add <world> <minX> <minY> <minZ> <maxX> <maxY> <maxZ> | clear | list
     permission: itemshops.market
-
+
   shophelp:
     description: Quick tutorial for ItemShops
     usage: /shophelp
-    aliases: [ shoptutorial, shopguide, sht ]
+    aliases: [shoptutorial, shopguide, sht]
     permission: itemshops.help
+
   store:
     description: Opens the ItemShops store link
     usage: /store
-    aliases: [ shopstore, tebex ]
+    aliases: [shopstore, tebex]
+
 permissions:
   itemshops.admin:
     default: op
@@ -44,6 +49,6 @@ permissions:
   itemshops.help:
     default: true
   itemshops.vault:
-    default: true
-  itemshops.market:
-    default: op
+    default: true
+  itemshops.market:
+    default: op
