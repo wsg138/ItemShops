@@ -19,11 +19,15 @@ import org.bukkit.block.Container;
 import org.bukkit.block.Sign;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -47,6 +51,10 @@ public final class ShopManager {
     private final ConcurrentLinkedQueue<Pos> refreshQueue = new ConcurrentLinkedQueue<>();
     private final java.util.Set<Pos> queued = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean draining = new AtomicBoolean(false);
+    private final Map<UUID, Integer> cachedTradesAvailable = new ConcurrentHashMap<>();
+    private final Map<UUID, SearchEntry> searchIndex = new ConcurrentHashMap<>();
+    private final Map<Material, Set<UUID>> sellIndex = new ConcurrentHashMap<>();
+    private final Map<Material, Set<UUID>> costIndex = new ConcurrentHashMap<>();
 
     private org.bukkit.scheduler.BukkitTask drainTask;
 
@@ -81,9 +89,20 @@ public final class ShopManager {
     }
 
     public void requestSignRefreshForContainer(Pos container) {
-        if (container != null && queued.add(container)) {
+        if (container == null) {
+            plugin.performance().signRefreshSkipped.increment();
+            return;
+        }
+        if (!registry.hasShopsOnContainer(container)) {
+            plugin.performance().nonShopRefreshSkipped.increment();
+            return;
+        }
+        if (queued.add(container)) {
             refreshQueue.add(container);
+            plugin.performance().signRefreshQueued.increment();
             scheduleDrainIfNeeded();
+        } else {
+            plugin.performance().signRefreshCoalesced.increment();
         }
     }
 
@@ -105,7 +124,9 @@ public final class ShopManager {
                 if (pos == null) break;
                 queued.remove(pos);
                 for (Shop shop : registry.shopsOn(pos)) {
+                    refreshCachedTrades(shop);
                     signService.updateSign(shop);
+                    plugin.performance().signRefreshProcessed.increment();
                 }
                 processed++;
             }
@@ -130,14 +151,23 @@ public final class ShopManager {
         return registry.all();
     }
 
+    public boolean hasAnyShops() {
+        return registry.hasAnyShops();
+    }
+
     public void clearAll() {
         stopSignUpdateScheduler();
         registry.clear();
         signService.clearOwnerCache();
+        clearRuntimeCaches();
     }
 
     public Shop getBySign(Pos signPos) {
         return registry.getBySign(signPos);
+    }
+
+    public boolean hasShopAtSign(Pos signPos) {
+        return registry.hasShopAtSign(signPos);
     }
 
     public List<Shop> byContainer(Pos container) {
@@ -146,6 +176,14 @@ public final class ShopManager {
 
     public List<Shop> shopsOn(Pos pos) {
         return registry.shopsOn(pos);
+    }
+
+    public boolean hasShopsOnContainer(Pos pos) {
+        return registry.hasShopsOnContainer(pos);
+    }
+
+    public List<Shop> shopsOnFast(Pos pos) {
+        return registry.shopsOnFast(pos);
     }
 
     public List<Shop> ownedBy(UUID owner) {
@@ -162,6 +200,8 @@ public final class ShopManager {
 
     public void put(Shop shop) {
         registry.put(shop);
+        indexShop(shop);
+        refreshCachedTrades(shop);
         signService.updateSign(shop);
         storage.saveAsync(registry.all());
         Bukkit.getPluginManager().callEvent(new ShopCreatedEvent(shop, shop.owner()));
@@ -188,6 +228,8 @@ public final class ShopManager {
     public void deleteShop(Shop shop, RemovalReason reason, UUID actor) {
         if (shop == null) return;
         if (!registry.remove(shop)) return;
+        unindexShop(shop);
+        cachedTradesAvailable.remove(shop.id());
         signService.clearSign(shop);
         storage.saveAsync(registry.all());
         Bukkit.getPluginManager().callEvent(new ShopDeletedEvent(shop, shop.owner(), reason, actor));
@@ -245,27 +287,81 @@ public final class ShopManager {
 
     public List<Shop> search(String query, String mode, int limit) {
         Material mat = ItemUtils.matchMaterial(query);
-        return registry.all().stream().filter(shop -> {
-            if (!shop.isSearchEnabled()) return false;
-
-            boolean inSell = false;
-            boolean inBuy = false;
-            if (mat != null) {
-                inSell = shop.sell().getType() == mat || ItemUtils.shulkerContains(shop.sell(), mat);
-                inBuy = shop.cost().getType() == mat || ItemUtils.shulkerContains(shop.cost(), mat);
-            }
-            return switch (mode.toLowerCase(Locale.ROOT)) {
-                case "sell" -> inSell;
-                case "buy" -> inBuy;
-                default -> inSell || inBuy;
+        plugin.performance().searchQueries.increment();
+        long start = System.nanoTime();
+        List<Shop> out;
+        if (mat == null) {
+            plugin.performance().searchIndexMisses.increment();
+            out = List.of();
+        } else {
+            Set<UUID> ids = switch (mode.toLowerCase(Locale.ROOT)) {
+                case "sell" -> sellIndex.getOrDefault(mat, Set.of());
+                case "buy" -> costIndex.getOrDefault(mat, Set.of());
+                default -> {
+                    Set<UUID> merged = ConcurrentHashMap.newKeySet();
+                    merged.addAll(sellIndex.getOrDefault(mat, Set.of()));
+                    merged.addAll(costIndex.getOrDefault(mat, Set.of()));
+                    yield merged;
+                }
             };
-        }).limit(limit).collect(Collectors.toList());
+            if (ids.isEmpty()) {
+                plugin.performance().searchIndexMisses.increment();
+                out = List.of();
+            } else {
+                plugin.performance().searchIndexHits.increment();
+                out = ids.stream()
+                        .map(searchIndex::get)
+                        .filter(entry -> entry != null && entry.shop.isSearchEnabled())
+                        .map(entry -> entry.shop)
+                        .limit(limit)
+                        .collect(Collectors.toList());
+            }
+        }
+        if (plugin.pluginConfig().performanceDebugEnabled()) {
+            long elapsedMicros = (System.nanoTime() - start) / 1000L;
+            plugin.getLogger().info("[Perf] search query='" + query + "' mode=" + mode + " results=" + out.size() + " micros=" + elapsedMicros);
+        }
+        return out;
     }
 
     public int computeTradesAvailable(Shop shop, Block contBlock) {
         if (shop == null || contBlock == null || !(contBlock.getState() instanceof Container cont)) return 0;
         int stock = ItemUtils.countSimilar(cont.getInventory(), shop.sell());
         return stock / Math.max(1, shop.sell().getAmount());
+    }
+
+    public int cachedTradesAvailable(Shop shop) {
+        if (shop == null) return 0;
+        Integer cached = cachedTradesAvailable.get(shop.id());
+        if (cached != null) {
+            plugin.performance().guiStockCacheHits.increment();
+            return cached;
+        }
+        plugin.performance().guiStockCacheMisses.increment();
+        return refreshCachedTrades(shop);
+    }
+
+    public int refreshCachedTrades(Shop shop) {
+        if (shop == null) return 0;
+        var location = shop.container().toLocation();
+        int trades = 0;
+        if (location != null && location.getBlock().getState() instanceof Container cont) {
+            int stock = ItemUtils.countSimilar(cont.getInventory(), shop.sell());
+            trades = stock / Math.max(1, shop.sell().getAmount());
+        }
+        cachedTradesAvailable.put(shop.id(), trades);
+        return trades;
+    }
+
+    public void refreshCachedTradesForContainer(Pos container) {
+        if (container == null || !registry.hasShopsOnContainer(container)) return;
+        for (Shop shop : registry.shopsOnFast(container)) {
+            refreshCachedTrades(shop);
+        }
+    }
+
+    public String cachedOwnerName(UUID ownerId) {
+        return signService.ownerName(ownerId);
     }
 
     public void indexExisting(Shop shop) {
@@ -335,6 +431,8 @@ public final class ShopManager {
     public void updateTradeItems(Shop shop, org.bukkit.inventory.ItemStack sell, org.bukkit.inventory.ItemStack cost) {
         shop.setSell(sell.clone());
         shop.setCost(cost.clone());
+        indexShop(shop);
+        refreshCachedTrades(shop);
         signService.updateSign(shop);
         requestSave();
     }
@@ -377,6 +475,8 @@ public final class ShopManager {
         clearAll();
         for (Shop shop : storage.loadAll()) {
             registry.indexExisting(shop);
+            indexShop(shop);
+            refreshCachedTrades(shop);
         }
     }
 
@@ -387,5 +487,61 @@ public final class ShopManager {
     public void shutdown() {
         stopSignUpdateScheduler();
         storage.shutdownAndSave(registry.all());
+    }
+
+    private void clearRuntimeCaches() {
+        cachedTradesAvailable.clear();
+        searchIndex.clear();
+        sellIndex.clear();
+        costIndex.clear();
+    }
+
+    private void indexShop(Shop shop) {
+        if (shop == null) return;
+        unindexShop(shop);
+        Set<Material> sellMaterials = searchableMaterials(shop.sell());
+        Set<Material> costMaterials = searchableMaterials(shop.cost());
+        searchIndex.put(shop.id(), new SearchEntry(shop, sellMaterials, costMaterials));
+        for (Material material : sellMaterials) {
+            sellIndex.computeIfAbsent(material, ignored -> ConcurrentHashMap.newKeySet()).add(shop.id());
+        }
+        for (Material material : costMaterials) {
+            costIndex.computeIfAbsent(material, ignored -> ConcurrentHashMap.newKeySet()).add(shop.id());
+        }
+    }
+
+    private void unindexShop(Shop shop) {
+        if (shop == null) return;
+        SearchEntry previous = searchIndex.remove(shop.id());
+        if (previous == null) return;
+        for (Material material : previous.sellMaterials) {
+            removeIndexId(sellIndex, material, shop.id());
+        }
+        for (Material material : previous.costMaterials) {
+            removeIndexId(costIndex, material, shop.id());
+        }
+    }
+
+    private void removeIndexId(Map<Material, Set<UUID>> index, Material material, UUID shopId) {
+        Set<UUID> ids = index.get(material);
+        if (ids == null) return;
+        ids.remove(shopId);
+        if (ids.isEmpty()) {
+            index.remove(material);
+        }
+    }
+
+    private Set<Material> searchableMaterials(ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) return Set.of();
+        EnumSet<Material> out = EnumSet.of(stack.getType());
+        for (ItemStack contained : ItemUtils.getShulkerContents(stack)) {
+            if (contained != null && !contained.getType().isAir()) {
+                out.add(contained.getType());
+            }
+        }
+        return out;
+    }
+
+    private record SearchEntry(Shop shop, Set<Material> sellMaterials, Set<Material> costMaterials) {
     }
 }

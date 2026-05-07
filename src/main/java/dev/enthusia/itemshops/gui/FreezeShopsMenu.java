@@ -75,7 +75,6 @@ public final class FreezeShopsMenu implements ShopMenu {
     }
 
     private void render(){
-        mgr.pruneInvalidShops();
         shops = mgr.ownedBy(target);
 
         inv.clear();

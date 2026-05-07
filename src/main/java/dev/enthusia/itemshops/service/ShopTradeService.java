@@ -129,6 +129,7 @@ public final class ShopTradeService {
             }
 
             int remainingStock = ItemUtils.countSimilar(contInv, sellT);
+            shopManager.refreshCachedTrades(shop);
             if (remainingStock < sellT.getAmount()) {
                 Bukkit.getPluginManager().callEvent(new ShopStockDepletedEvent(shop, shop.owner(), buyer.getUniqueId()));
             }

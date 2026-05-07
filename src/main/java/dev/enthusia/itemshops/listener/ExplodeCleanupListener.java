@@ -1,8 +1,9 @@
 package dev.enthusia.itemshops.listener;
 
 import dev.enthusia.itemshops.manager.ShopManager;
-import dev.enthusia.itemshops.model.Shop;
-import dev.enthusia.itemshops.util.Pos;
+import dev.enthusia.itemshops.model.Shop;
+import dev.enthusia.itemshops.util.ItemUtils;
+import dev.enthusia.itemshops.util.Pos;
 import org.bukkit.block.Block;
 import org.bukkit.block.Container;
 import org.bukkit.block.Sign;
@@ -21,14 +22,16 @@ public final class ExplodeCleanupListener implements Listener {
     @EventHandler public void onEntityExplode(EntityExplodeEvent e) { handle(e.blockList()); }
     @EventHandler public void onBlockExplode(BlockExplodeEvent e) { handle(e.blockList()); }
 
-    private void handle(List<Block> blocks) {
-        if (blocks == null || blocks.isEmpty()) return;
+    private void handle(List<Block> blocks) {
+        if (!mgr.hasAnyShops()) return;
+        if (blocks == null || blocks.isEmpty()) return;
         List<Shop> toRemove = new ArrayList<>();
         for (Block b : blocks) {
-            if (b.getState() instanceof Sign) {
+            if (ItemUtils.couldBeSign(b.getType()) && b.getState() instanceof Sign) {
                 var s = mgr.getBySign(Pos.of(b.getLocation()));
                 if (s != null && !toRemove.contains(s)) toRemove.add(s);
             }
+            if (!mgr.isAllowedContainer(b.getType())) continue;
             if (b.getState() instanceof Container) {
                 var uni = mgr.unifyContainerPos(b);
                 for (Shop s : mgr.shopsOn(uni)) if (!toRemove.contains(s)) toRemove.add(s);

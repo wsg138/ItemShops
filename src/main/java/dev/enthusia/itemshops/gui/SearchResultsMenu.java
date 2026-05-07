@@ -68,15 +68,10 @@ public final class SearchResultsMenu implements ShopMenu {
             ItemStack icon = s.sell().clone(); 
             ItemMeta im = icon.getItemMeta();
 
-            String owner = Bukkit.getOfflinePlayer(s.owner()).getName();
-            if (owner == null) owner = "Unknown";
-
-            int trades = 0;
-            var loc = s.container().toLocation();
-            if (loc != null && loc.getBlock().getState() instanceof org.bukkit.block.Container cont) {
-                int stock = ItemUtils.countSimilar(cont.getInventory(), s.sell());
-                trades = stock / Math.max(1, s.sell().getAmount());
-            }
+            String owner = plugin.shops().cachedOwnerName(s.owner());
+            if (owner == null) owner = "Unknown";
+
+            int trades = plugin.shops().cachedTradesAvailable(s);
             boolean inStock = trades > 0;
 
             im.setDisplayName(ItemUtils.colored((inStock ? "&a" : "&c") + (inStock ? "IN STOCK" : "OUT OF STOCK") + " &7- " + owner));

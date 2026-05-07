@@ -1,3 +1,4 @@
+messages-version: 1
 prefix: "&6[ItemShops] &r"
 errors:
   no-permission: "&cYou don't have permission."

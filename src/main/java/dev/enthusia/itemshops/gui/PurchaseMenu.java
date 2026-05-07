@@ -141,10 +141,7 @@ public final class PurchaseMenu implements ShopMenu {
     }
 
     private int computeStockTrades() {
-        Block contBlock = shop.container().toLocation() == null ? null : shop.container().toLocation().getBlock();
-        if (contBlock == null || !(contBlock.getState() instanceof Container cont)) return 0;
-        int stock = ItemUtils.countSimilar(cont.getInventory(), shop.sell());
-        return stock / Math.max(1, shop.sell().getAmount());
+        return mgr.cachedTradesAvailable(shop);
     }
 
     private int computeAffordableTrades() {

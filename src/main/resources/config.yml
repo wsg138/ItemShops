@@ -1,4 +1,5 @@
 # ItemShops production config
+config-version: 2
 #
 # Notes:
 # - Shops inside a configured market region default to being searchable.
@@ -79,5 +80,25 @@ safety:
 storage:
   file: "shops.yml"
 
+analytics:
+  # Records lightweight ItemShops activity history for admin review and optional integrations.
+  enabled: true
+  history-file: "analytics.yml"
+  retention-days: 30
+  recent-table-limit: 10
+  plan:
+    enabled: true
+
+shop-audit:
+  enabled: true
+  interval-minutes: 10
+  max-shops-per-tick: 5
+  repair-enabled: true
+  report-only: false
+  debug-log-repairs: false
+
 debug:
   removals: true
+  performance:
+    enabled: false
+    log-interval-seconds: 300

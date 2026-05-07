@@ -62,7 +62,6 @@ public final class DeleteShopsMenu implements ShopMenu {
     }
 
     private void render(){
-        mgr.pruneInvalidShops();
         if (showAll) {
             shops = new ArrayList<>(mgr.all());
         } else {

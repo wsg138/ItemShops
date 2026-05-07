@@ -7,6 +7,7 @@ import dev.enthusia.itemshops.gui.ShopEditMenu;
 import dev.enthusia.itemshops.gui.ShopContentsMenu;
 import dev.enthusia.itemshops.manager.ShopManager;
 import dev.enthusia.itemshops.model.Shop;
+import dev.enthusia.itemshops.util.ItemUtils;
 import dev.enthusia.itemshops.util.Pos;
 import dev.enthusia.itemshops.util.Texts;
 import org.bukkit.block.Block;
@@ -31,13 +32,17 @@ public final class SignShopListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onSignInteract(PlayerInteractEvent e) {
-        if (e.getAction() != Action.LEFT_CLICK_BLOCK && e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        Block b = e.getClickedBlock();
-        if (b == null || !(b.getState() instanceof Sign sign)) return;
+        if (e.getAction() != Action.LEFT_CLICK_BLOCK && e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        Block b = e.getClickedBlock();
+        if (b == null || !ItemUtils.couldBeSign(b.getType())) {
+            plugin.performance().blockStateSkipped.increment();
+            return;
+        }
+        if (!(b.getState() instanceof Sign sign)) return;
 
         Player p = e.getPlayer();
         Pos signPos = Pos.of(b.getLocation());
-        Shop shop = mgr.getBySign(signPos);
+        Shop shop = mgr.hasAnyShops() ? mgr.getBySign(signPos) : null;
 
         if (shop != null && p.hasPermission("itemshops.admin")) {
             if (plugin.isAdminInfoActive(p.getUniqueId())) {
@@ -78,7 +83,7 @@ public final class SignShopListener implements Listener {
             if (!p.isSneaking()) return;
 
             Block container = mgr.findAttachedContainer(sign);
-            if (container == null || !(container.getState() instanceof Container) || !mgr.isAllowedContainer(container.getType())) {
+            if (container == null || !mgr.isAllowedContainer(container.getType()) || !(container.getState() instanceof Container)) {
                 e.setCancelled(true);
                 p.sendMessage(Texts.msg(plugin.messages(), "errors.no-container"));
                 return;

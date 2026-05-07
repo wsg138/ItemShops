@@ -32,6 +32,7 @@ public final class ShopStorage {
     private FileConfiguration cfg;
     private BukkitTask pendingSaveTask;
     private BukkitTask pendingAsyncWriteTask;
+    private Collection<Shop> pendingSaveSource;
 
     public ShopStorage(ItemShopsPlugin plugin, ItemShopsConfig pluginConfig, MarketRegionManager marketRegionManager) {
         this.plugin = plugin;
@@ -52,11 +53,18 @@ public final class ShopStorage {
     }
 
     public synchronized void saveAsync(Collection<Shop> shops) {
-        if (pendingSaveTask != null) pendingSaveTask.cancel();
-        List<StoredShop> snapshot = buildSnapshot(shops);
+        plugin.performance().storageSaveRequested.increment();
+        pendingSaveSource = new ArrayList<>(shops);
+        if (pendingSaveTask != null) {
+            pendingSaveTask.cancel();
+            plugin.performance().storageSaveCoalesced.increment();
+        }
         pendingSaveTask = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            List<StoredShop> snapshot;
             synchronized (ShopStorage.this) {
                 pendingSaveTask = null;
+                snapshot = buildSnapshot(pendingSaveSource == null ? List.of() : pendingSaveSource);
+                pendingSaveSource = null;
                 if (pendingAsyncWriteTask != null) pendingAsyncWriteTask.cancel();
                 pendingAsyncWriteTask = plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
                     synchronized (ShopStorage.this) {
@@ -118,6 +126,7 @@ public final class ShopStorage {
             pendingAsyncWriteTask.cancel();
             pendingAsyncWriteTask = null;
         }
+        pendingSaveSource = null;
     }
 
     private void resetFileHandle() {
@@ -175,7 +184,9 @@ public final class ShopStorage {
                 Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
             cfg = out;
+            plugin.performance().storageSaveWritten.increment();
         } catch (IOException e) {
+            plugin.performance().storageSaveFailed.increment();
             plugin.getLogger().severe("Failed saving shop storage: " + e.getMessage());
         } finally {
             if (tmp.exists() && !tmp.equals(file)) {

@@ -45,6 +45,7 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ItemUtils.colored("&e/itemshops freeze <player|all|menu> [duration]"));
             sender.sendMessage(ItemUtils.colored("&e/itemshops unfreeze <player|all|menu>"));
             sender.sendMessage(ItemUtils.colored("&e/itemshops vault <player>"));
+            sender.sendMessage(ItemUtils.colored("&e/itemshops performance"));
             return true;
         }
 
@@ -58,11 +59,8 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if ("search".equalsIgnoreCase(args[0])) {
-            
-            mgr.pruneInvalidShops();
-
-            if (args.length < 2) { sender.sendMessage(Texts.msg(ItemShopsPlugin.get().messages(), "search.usage")); return true; }
+        if ("search".equalsIgnoreCase(args[0])) {
+            if (args.length < 2) { sender.sendMessage(Texts.msg(ItemShopsPlugin.get().messages(), "search.usage")); return true; }
             String query = args[1];
             String mode = args.length >=3 ? args[2].toLowerCase(Locale.ROOT) : "any";
             int page = 0;
@@ -79,13 +77,8 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(Texts.fmt(ItemShopsPlugin.get().messages(),"search.header","count", (to-from), "query", query, "mode", mode));
                 for (int i=from;i<to;i++) {
                     Shop s = list.get(i);
-                    String owner = Optional.ofNullable(Bukkit.getOfflinePlayer(s.owner()).getName()).orElse("Unknown");
-                    int trades = 0;
-                    var loc = s.container().toLocation();
-                    if (loc != null && loc.getBlock().getState() instanceof org.bukkit.block.Container cont) {
-                        int stock = dev.enthusia.itemshops.util.ItemUtils.countSimilar(cont.getInventory(), s.sell());
-                        trades = stock / Math.max(1, s.sell().getAmount());
-                    }
+                    String owner = Optional.ofNullable(ItemShopsPlugin.get().shops().cachedOwnerName(s.owner())).orElse("Unknown");
+                    int trades = ItemShopsPlugin.get().shops().cachedTradesAvailable(s);
                     sender.sendMessage(Texts.fmt(ItemShopsPlugin.get().messages(), "search.line",
                             "world", s.sign().world, "x", s.sign().x, "y", s.sign().y, "z", s.sign().z,
                             "owner", owner,
@@ -135,9 +128,8 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if ("list".equalsIgnoreCase(args[0])) {
-            mgr.pruneInvalidShops();
-            if (!(sender instanceof Player p)) { sender.sendMessage("Players only."); return true; }
+        if ("list".equalsIgnoreCase(args[0])) {
+            if (!(sender instanceof Player p)) { sender.sendMessage("Players only."); return true; }
             var list = mgr.ownedBy(p.getUniqueId());
             if (list.isEmpty()) { p.sendMessage(ItemUtils.colored("&7You own no shops.")); return true; }
             p.sendMessage(ItemUtils.colored("&6Your shops ("+list.size()+")"));
@@ -148,15 +140,13 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if ("edit".equalsIgnoreCase(args[0])) {
-            mgr.pruneInvalidShops();
-            if (!(sender instanceof Player p)) { sender.sendMessage("Players only."); return true; }
+        if ("edit".equalsIgnoreCase(args[0])) {
+            if (!(sender instanceof Player p)) { sender.sendMessage("Players only."); return true; }
             new OwnedShopsMenu(ItemShopsPlugin.get(), mgr, p).open();
             return true;
         }
 
         if ("delete".equalsIgnoreCase(args[0])) {
-            mgr.pruneInvalidShops();
             if (!(sender instanceof Player p)) { sender.sendMessage("Players only."); return true; }
             boolean all = args.length >= 2 && "all".equalsIgnoreCase(args[1]);
             if (all && !sender.hasPermission("itemshops.admin")) {
@@ -288,15 +278,25 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(Texts.msg(ItemShopsPlugin.get().messages(), "errors.no-permission"));
                 return true;
             }
-            mgr.pruneInvalidShops();
+            ItemShopsPlugin.get().audit().startAudit(true);
             long nowMs = System.currentTimeMillis();
             boolean changed = false;
             for (Shop s : mgr.all()) {
                 if (s.clearIfFreezeExpired(nowMs)) changed = true;
-                ItemShopsPlugin.get().shops().updateSign(s);
+                ItemShopsPlugin.get().shops().requestSignRefresh(s);
             }
             if (changed) mgr.requestSave();
-            sender.sendMessage(ItemUtils.colored("&aRefreshed shops and signs."));
+            sender.sendMessage(ItemUtils.colored("&aQueued shop audit and sign refreshes."));
+            return true;
+        }
+
+        if ("performance".equalsIgnoreCase(args[0])) {
+            if (!sender.hasPermission("itemshops.admin")) {
+                sender.sendMessage(Texts.msg(ItemShopsPlugin.get().messages(), "errors.no-permission"));
+                return true;
+            }
+            ItemShopsPlugin.get().performance().logSnapshot();
+            sender.sendMessage(ItemUtils.colored("&aItemShops performance counters were logged to console."));
             return true;
         }
 
@@ -375,7 +375,7 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        if (args.length == 1) return Arrays.asList("reload","search","trust","untrust","list","edit","delete","breakdelete","adminview","info","breakothers","remove","teleport","fix","freeze","unfreeze","vault");
+        if (args.length == 1) return Arrays.asList("reload","search","trust","untrust","list","edit","delete","breakdelete","adminview","info","breakothers","remove","teleport","fix","freeze","unfreeze","vault","performance");
 
         if ("search".equalsIgnoreCase(args[0])) {
             if (args.length == 2) {

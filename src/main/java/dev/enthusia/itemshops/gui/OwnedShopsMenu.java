@@ -58,7 +58,6 @@ public final class OwnedShopsMenu implements ShopMenu {
     }
 
     private void render(){
-        mgr.pruneInvalidShops();
         shops = mgr.ownedBy(owner.getUniqueId());
 
         inv.clear();

@@ -29,6 +29,10 @@ public final class ShopRegistry {
         return count;
     }
 
+    public boolean hasAnyShops() {
+        return !shopsBySign.isEmpty();
+    }
+
     public Collection<Shop> all() {
         List<Shop> out = new ArrayList<>();
         for (List<Shop> shops : shopsByContainer.values()) {
@@ -41,10 +45,24 @@ public final class ShopRegistry {
         return shopsBySign.get(signPos);
     }
 
+    public boolean hasShopAtSign(Pos signPos) {
+        return shopsBySign.containsKey(signPos);
+    }
+
     public List<Shop> shopsOn(Pos containerPos) {
         List<Shop> list = shopsByContainer.get(containerPos);
         if (list == null || list.isEmpty()) return List.of();
         return new ArrayList<>(list);
+    }
+
+    public boolean hasShopsOnContainer(Pos containerPos) {
+        List<Shop> list = shopsByContainer.get(containerPos);
+        return list != null && !list.isEmpty();
+    }
+
+    public List<Shop> shopsOnFast(Pos containerPos) {
+        List<Shop> list = shopsByContainer.get(containerPos);
+        return list == null || list.isEmpty() ? List.of() : list;
     }
 
     public List<Shop> ownedBy(UUID ownerId) {

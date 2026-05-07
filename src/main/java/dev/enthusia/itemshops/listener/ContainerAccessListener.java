@@ -2,8 +2,9 @@ package dev.enthusia.itemshops.listener;
 
 import dev.enthusia.itemshops.ItemShopsPlugin;
 import dev.enthusia.itemshops.manager.ShopManager;
-import dev.enthusia.itemshops.model.Shop;
-import dev.enthusia.itemshops.util.Pos;
+import dev.enthusia.itemshops.model.Shop;
+import dev.enthusia.itemshops.util.ItemUtils;
+import dev.enthusia.itemshops.util.Pos;
 import dev.enthusia.itemshops.util.Texts;
 import org.bukkit.block.Block;
 import org.bukkit.block.Container;
@@ -33,13 +34,18 @@ public final class ContainerAccessListener implements Listener {
     
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent e) {
+        if (!mgr.hasAnyShops()) return;
         if (e.getClickedBlock() == null) return;
         Block b = e.getClickedBlock();
+        if (!ItemUtils.couldBeConfiguredContainer(b.getType(), plugin.pluginConfig().allowedContainers())) {
+            plugin.performance().blockStateSkipped.increment();
+            return;
+        }
         if (!(b.getState() instanceof Container)) return;
 
         
         Pos uni = mgr.unifyContainerPos(b);
-        List<Shop> shops = mgr.shopsOn(uni);
+        List<Shop> shops = mgr.shopsOnFast(uni);
         if (shops.isEmpty()) return;
 
         Player p = e.getPlayer();
@@ -52,8 +58,9 @@ public final class ContainerAccessListener implements Listener {
 
     
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onOpen(InventoryOpenEvent e) {
-        Inventory inv = e.getInventory();
+    public void onOpen(InventoryOpenEvent e) {
+        if (!mgr.hasAnyShops()) return;
+        Inventory inv = e.getInventory();
         InventoryHolder holder = inv.getHolder();
         Block block = null;
 
@@ -67,7 +74,7 @@ public final class ContainerAccessListener implements Listener {
         if (block == null) return;
 
         Pos uni = mgr.unifyContainerPos(block);
-        List<Shop> shops = mgr.shopsOn(uni);
+        List<Shop> shops = mgr.shopsOnFast(uni);
         if (shops.isEmpty()) return;
 
         Player p = (Player) e.getPlayer();

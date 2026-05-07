@@ -3,8 +3,9 @@ package dev.enthusia.itemshops.listener;
 import dev.enthusia.itemshops.ItemShopsPlugin;
 import dev.enthusia.itemshops.gui.ShopEditMenu;
 import dev.enthusia.itemshops.manager.ShopManager;
-import dev.enthusia.itemshops.model.Shop;
-import dev.enthusia.itemshops.util.Pos;
+import dev.enthusia.itemshops.model.Shop;
+import dev.enthusia.itemshops.util.ItemUtils;
+import dev.enthusia.itemshops.util.Pos;
 import dev.enthusia.itemshops.util.Texts;
 import org.bukkit.block.Block;
 import org.bukkit.block.Container;
@@ -24,11 +25,12 @@ public final class BlockProtectionListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
-    public void onBreak(BlockBreakEvent e) {
-        Block b = e.getBlock();
-        Player p = e.getPlayer();
-
-        if (b.getState() instanceof Sign) {
+    public void onBreak(BlockBreakEvent e) {
+        if (!mgr.hasAnyShops()) return;
+        Block b = e.getBlock();
+        Player p = e.getPlayer();
+
+        if (ItemUtils.couldBeSign(b.getType()) && b.getState() instanceof Sign) {
             Shop s = mgr.getBySign(Pos.of(b.getLocation()));
             if (s != null) {
                 boolean isOwner = p.getUniqueId().equals(s.owner()) || p.hasPermission("itemshops.admin");
@@ -47,6 +49,10 @@ public final class BlockProtectionListener implements Listener {
             return;
         }
 
+        if (!ItemUtils.couldBeConfiguredContainer(b.getType(), plugin.pluginConfig().allowedContainers())) {
+            plugin.performance().blockStateSkipped.increment();
+            return;
+        }
         if (b.getState() instanceof Container) {
             Pos uni = mgr.unifyContainerPos(b);
             var shops = mgr.shopsOn(uni);

@@ -10,6 +10,9 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,6 +37,7 @@ public final class VaultManager {
     private final File file;
     private FileConfiguration cfg;
     private BukkitTask pendingSaveTask;
+    private BukkitTask pendingAsyncWriteTask;
     private static final long SAVE_DEBOUNCE_TICKS = 40L;
 
     public VaultManager(ItemShopsPlugin plugin){
@@ -107,7 +111,17 @@ public final class VaultManager {
         if (changed) saveAsync();
     }
 
-    public void saveNow() { saveAll(); }
+    public void saveNow() {
+        if (pendingSaveTask != null) {
+            pendingSaveTask.cancel();
+            pendingSaveTask = null;
+        }
+        if (pendingAsyncWriteTask != null) {
+            pendingAsyncWriteTask.cancel();
+            pendingAsyncWriteTask = null;
+        }
+        saveAll(snapshot());
+    }
 
     private void ensureFile() {
         if (!file.exists()) {
@@ -149,9 +163,23 @@ public final class VaultManager {
         }
     }
 
-    private void saveAll() {
-        FileConfiguration out = new YamlConfiguration();
+    private Map<UUID, List<VaultEntry>> snapshot() {
+        Map<UUID, List<VaultEntry>> snapshot = new LinkedHashMap<>();
         for (var entry : entries.entrySet()) {
+            List<VaultEntry> list = new ArrayList<>();
+            for (VaultEntry ve : entry.getValue()) {
+                list.add(new VaultEntry(ve.owner, ve.item.clone(), ve.amount, ve.expiresAt));
+            }
+            if (!list.isEmpty()) {
+                snapshot.put(entry.getKey(), list);
+            }
+        }
+        return snapshot;
+    }
+
+    private void saveAll(Map<UUID, List<VaultEntry>> snapshot) {
+        FileConfiguration out = new YamlConfiguration();
+        for (var entry : snapshot.entrySet()) {
             String key = entry.getKey().toString();
             List<Map<String,Object>> list = new ArrayList<>();
             for (VaultEntry ve : entry.getValue()) {
@@ -163,11 +191,21 @@ public final class VaultManager {
             }
             out.set("vault." + key, list);
         }
+        File tmp = new File(file.getParentFile(), file.getName() + ".tmp");
         try {
-            out.save(file);
+            out.save(tmp);
+            try {
+                Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
             cfg = out;
         } catch (IOException e) {
             plugin.getLogger().severe("Failed saving vault.yml: " + e.getMessage());
+        } finally {
+            if (tmp.exists() && !tmp.equals(file)) {
+                tmp.delete();
+            }
         }
     }
 
@@ -175,7 +213,12 @@ public final class VaultManager {
         if (pendingSaveTask != null) pendingSaveTask.cancel();
         pendingSaveTask = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             pendingSaveTask = null;
-            saveAll();
+            Map<UUID, List<VaultEntry>> snapshot = snapshot();
+            if (pendingAsyncWriteTask != null) pendingAsyncWriteTask.cancel();
+            pendingAsyncWriteTask = plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                pendingAsyncWriteTask = null;
+                saveAll(snapshot);
+            });
         }, SAVE_DEBOUNCE_TICKS);
     }
 }

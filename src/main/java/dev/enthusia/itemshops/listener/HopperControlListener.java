@@ -19,16 +19,17 @@ public final class HopperControlListener implements Listener {
     private final ShopManager mgr;
     public HopperControlListener(ShopManager mgr){ this.mgr = mgr; }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onMove(InventoryMoveItemEvent e) {
-        
-        Inventory src = e.getSource();
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMove(InventoryMoveItemEvent e) {
+        if (!mgr.hasAnyShops()) return;
+        
+        Inventory src = e.getSource();
         Inventory dst = e.getDestination();
 
         
-        Pos srcPos = containerPosOf(src);
-        if (srcPos != null) {
-            List<Shop> shops = mgr.shopsOn(srcPos);
+        Pos srcPos = containerPosOf(src);
+        if (srcPos != null) {
+            List<Shop> shops = mgr.shopsOnFast(srcPos);
             if (!shops.isEmpty()) {
                 boolean allow = shops.stream().allMatch(Shop::isHopperAllowOut);
                 if (!allow) { e.setCancelled(true); return; }
@@ -38,9 +39,9 @@ public final class HopperControlListener implements Listener {
         }
 
         
-        Pos dstPos = containerPosOf(dst);
-        if (dstPos != null) {
-            List<Shop> shops = mgr.shopsOn(dstPos);
+        Pos dstPos = containerPosOf(dst);
+        if (dstPos != null) {
+            List<Shop> shops = mgr.shopsOnFast(dstPos);
             if (!shops.isEmpty()) {
                 boolean allow = shops.stream().allMatch(Shop::isHopperAllowIn);
                 if (!allow) { e.setCancelled(true); return; }

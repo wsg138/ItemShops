@@ -37,7 +37,11 @@ public final class RecoveryListener implements Listener {
         if (e.getAction() != Action.LEFT_CLICK_BLOCK && e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
 
         Block clicked = e.getClickedBlock();
-        if (clicked == null || !(clicked.getState() instanceof Sign sign)) return;
+        if (clicked == null || !ItemUtils.couldBeSign(clicked.getType())) {
+            plugin.performance().blockStateSkipped.increment();
+            return;
+        }
+        if (!(clicked.getState() instanceof Sign sign)) return;
 
         Pos signPos = Pos.of(clicked.getLocation());
         Shop indexed = mgr.getBySign(signPos);
@@ -61,6 +65,7 @@ public final class RecoveryListener implements Listener {
                     if (player != null) {
                         player.sendMessage(ItemUtils.colored("&eRepaired shop sign link."));
                     }
+                    plugin.performance().recoveryActions.increment();
                     return;
                 }
             }
@@ -74,6 +79,7 @@ public final class RecoveryListener implements Listener {
         if (player != null) {
             player.sendMessage(ItemUtils.colored("&eRecovered shop from disk."));
         }
+        plugin.performance().recoveryActions.increment();
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

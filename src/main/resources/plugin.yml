@@ -1,14 +1,14 @@
 name: ItemShops
 main: dev.enthusia.itemshops.ItemShopsPlugin
-version: 1.1.1
+version: 1.7.1
 api-version: '1.21'
-softdepend: [ARM-Guilds-Bridge, LumaGuilds, WorldGuard, Vault]
+softdepend: [ARM-Guilds-Bridge, LumaGuilds, WorldGuard, Vault, Plan]
 author: Enthusia
 
 commands:
   itemshops:
     description: ItemShops commands
-    usage: /itemshops <reload|search|trust|untrust|list|edit|delete|breakdelete|adminview|info|breakothers|remove|teleport|fix|freeze|unfreeze|vault>
+    usage: /itemshops <reload|search|trust|untrust|list|edit|delete|breakdelete|adminview|info|breakothers|remove|teleport|fix|freeze|unfreeze|vault|performance>
     aliases: [shops, shop]
 
   shopvault:

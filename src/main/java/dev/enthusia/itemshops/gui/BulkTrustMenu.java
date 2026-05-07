@@ -70,7 +70,6 @@ public final class BulkTrustMenu implements ShopMenu {
     private void setTrusted(Shop s, boolean v){ mgr.setTrusted(s, target, v); }
 
     private void render(){
-        mgr.pruneInvalidShops();
         shops = mgr.ownedBy(owner.getUniqueId());
 
         inv.clear();

@@ -21,17 +21,35 @@ public final class ContainerStockListener implements Listener {
     public ContainerStockListener(ShopManager mgr){ this.mgr = mgr; }
 
     
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onClick(InventoryClickEvent e) {
-        Pos p = containerPosOfTop(e.getView());
-        if (p != null) mgr.requestSignRefreshForContainer(p);
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onDrag(InventoryDragEvent e) {
-        Pos p = containerPosOfTop(e.getView());
-        if (p != null) mgr.requestSignRefreshForContainer(p);
-    }
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onClick(InventoryClickEvent e) {
+        if (!mgr.hasAnyShops()) return;
+        Pos p = containerPosOfTop(e.getView());
+        if (p != null && mgr.hasShopsOnContainer(p)) {
+            mgr.refreshCachedTradesForContainer(p);
+            mgr.requestSignRefreshForContainer(p);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDrag(InventoryDragEvent e) {
+        if (!mgr.hasAnyShops()) return;
+        Pos p = containerPosOfTop(e.getView());
+        if (p != null && mgr.hasShopsOnContainer(p)) {
+            mgr.refreshCachedTradesForContainer(p);
+            mgr.requestSignRefreshForContainer(p);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onClose(InventoryCloseEvent e) {
+        if (!mgr.hasAnyShops()) return;
+        Pos p = containerPosOfTop(e.getView());
+        if (p != null && mgr.hasShopsOnContainer(p)) {
+            mgr.refreshCachedTradesForContainer(p);
+            mgr.requestSignRefreshForContainer(p);
+        }
+    }
 
     private Pos containerPosOfTop(InventoryView view) {
         Inventory top = view.getTopInventory();

@@ -118,7 +118,7 @@ public final class ShopSignService {
         ownerNameCache.put(ownerId, offline != null && offline.getName() != null ? offline.getName() : "Unknown");
     }
 
-    private String ownerName(UUID ownerId) {
+    public String ownerName(UUID ownerId) {
         String name = ownerNameCache.get(ownerId);
         if (name != null) return name;
         cacheOwnerName(ownerId);

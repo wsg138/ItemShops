@@ -2,6 +2,11 @@ package dev.enthusia.itemshops;
 
 import dev.enthusia.itemshops.command.ItemShopsCommand;
 import dev.enthusia.itemshops.command.ShopHelpCommand;
+import dev.enthusia.itemshops.analytics.ShopAnalyticsListener;
+import dev.enthusia.itemshops.analytics.ShopAnalyticsStore;
+import dev.enthusia.itemshops.analytics.plan.AnalyticsIntegration;
+import dev.enthusia.itemshops.analytics.plan.PlanAnalyticsHook;
+import dev.enthusia.itemshops.config.ConfigMigrator;
 import dev.enthusia.itemshops.config.ItemShopsConfig;
 import dev.enthusia.itemshops.data.ShopStorage;
 import dev.enthusia.itemshops.gui.ChatAmountCapture;
@@ -17,12 +22,16 @@ import dev.enthusia.itemshops.manager.GuildShopIntegration;
 import dev.enthusia.itemshops.manager.ShopManager;
 import dev.enthusia.itemshops.service.ShopLocator;
 import dev.enthusia.itemshops.service.ShopPlacementPolicy;
+import dev.enthusia.itemshops.service.ShopAuditService;
 import dev.enthusia.itemshops.service.ShopRegistry;
 import dev.enthusia.itemshops.service.ShopSignService;
 import dev.enthusia.itemshops.service.ShopTradeService;
+import dev.enthusia.itemshops.util.PerformanceCounters;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -39,6 +48,11 @@ public final class ItemShopsPlugin extends JavaPlugin {
     private dev.enthusia.itemshops.region.MarketRegionManager marketManager;
     private GuildShopIntegration guildShopIntegration;
     private ShopTradeService shopTradeService;
+    private ShopAnalyticsStore analyticsStore;
+    private AnalyticsIntegration planAnalytics;
+    private ShopAuditService shopAuditService;
+    private PerformanceCounters performanceCounters;
+    private FileConfiguration messages;
 
     private final Map<UUID, Long> breakDeleteExpiry = new ConcurrentHashMap<>();
     private final Set<UUID> adminViewEnabled = ConcurrentHashMap.newKeySet();
@@ -70,11 +84,12 @@ public final class ItemShopsPlugin extends JavaPlugin {
         instance = this;
 
         saveDefaultConfig();
-        ensureConfigDefaults();
-        saveResource("messages.yml", false);
-        YamlLoader.mergeDefaults(this, "messages.yml");
+        new ConfigMigrator(this).migrateStartupFiles();
+        reloadCachedMessages();
 
         pluginConfig = new ItemShopsConfig(this);
+        performanceCounters = new PerformanceCounters(this);
+        analyticsStore = new ShopAnalyticsStore(this);
         marketManager = new dev.enthusia.itemshops.region.MarketRegionManager(this);
         storage = new ShopStorage(this, pluginConfig, marketManager);
         ShopRegistry registry = new ShopRegistry();
@@ -91,6 +106,9 @@ public final class ItemShopsPlugin extends JavaPlugin {
                 signService
         );
         shopManager.startSignUpdateScheduler();
+        shopAuditService = new ShopAuditService(this, shopManager);
+        shopAuditService.restart();
+        performanceCounters.restartLogger();
 
         getServer().getPluginManager().registerEvents(new SignShopListener(this, shopManager), this);
         getServer().getPluginManager().registerEvents(new BlockProtectionListener(this, shopManager), this);
@@ -99,6 +117,7 @@ public final class ItemShopsPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ContainerAccessListener(this, shopManager), this);
         getServer().getPluginManager().registerEvents(new ExplodeCleanupListener(shopManager), this);
         getServer().getPluginManager().registerEvents(new HopperControlListener(shopManager), this);
+        getServer().getPluginManager().registerEvents(new ShopAnalyticsListener(this, analyticsStore), this);
 
         vaultManager = new dev.enthusia.itemshops.vault.VaultManager(this);
         guildShopIntegration = new GuildShopIntegration(this);
@@ -138,12 +157,18 @@ public final class ItemShopsPlugin extends JavaPlugin {
         }
 
         shopManager.loadFromStorage();
-        int pruned = shopManager.pruneInvalidShops();
-        getLogger().info("ItemShops enabled. Loaded " + shopManager.size() + " shops (pruned " + pruned + ").");
+        hookPlanAnalytics();
+        getLogger().info("ItemShops enabled. Loaded " + shopManager.size() + " shops.");
     }
 
     @Override
     public void onDisable() {
+        if (shopAuditService != null) {
+            shopAuditService.stop();
+        }
+        if (performanceCounters != null) {
+            performanceCounters.stopLogger();
+        }
         try {
             if (shopManager != null) {
                 shopManager.shutdown();
@@ -155,10 +180,17 @@ public final class ItemShopsPlugin extends JavaPlugin {
         if (vaultManager != null) {
             vaultManager.saveNow();
         }
+        if (planAnalytics != null) {
+            planAnalytics.shutdown();
+            planAnalytics = null;
+        }
+        if (analyticsStore != null) {
+            analyticsStore.shutdown();
+        }
     }
 
     public FileConfiguration messages() {
-        return YamlLoader.get(this, "messages.yml");
+        return messages;
     }
 
     public ShopManager shops() {
@@ -169,8 +201,25 @@ public final class ItemShopsPlugin extends JavaPlugin {
         return storage;
     }
 
+    public ShopAnalyticsStore analytics() {
+        return analyticsStore;
+    }
+
+    public ShopAuditService audit() {
+        return shopAuditService;
+    }
+
+    public PerformanceCounters performance() {
+        return performanceCounters;
+    }
+
     public ItemShopsConfig pluginConfig() {
         return pluginConfig;
+    }
+
+    private void reloadCachedMessages() {
+        YamlLoader.mergeDefaults(this, "messages.yml");
+        messages = YamlConfiguration.loadConfiguration(new File(getDataFolder(), "messages.yml"));
     }
 
     private boolean ensureConfigDefaults() {
@@ -182,24 +231,59 @@ public final class ItemShopsPlugin extends JavaPlugin {
     }
 
     public void reloadAll() {
-        ensureConfigDefaults();
+        new ConfigMigrator(this).migrateStartupFiles();
         reloadConfig();
         if (pluginConfig != null) {
             pluginConfig.reload();
         }
-        YamlLoader.mergeDefaults(this, "messages.yml");
-        YamlLoader.reload(this, "messages.yml");
+        reloadCachedMessages();
+        if (shopManager != null) {
+            shopManager.saveNow();
+        }
         storage.reloadFile();
+        if (analyticsStore != null) {
+            analyticsStore.reload();
+        }
         if (marketManager != null) {
             marketManager.reload();
         }
 
-        shopManager.saveNow();
-        shopManager.loadFromStorage();
         shopManager.startSignUpdateScheduler();
+        if (shopAuditService != null) {
+            shopAuditService.restart();
+        }
+        if (performanceCounters != null) {
+            performanceCounters.restartLogger();
+        }
 
-        int pruned = shopManager.pruneInvalidShops();
-        getLogger().info("Reload complete. Shops: " + shopManager.size() + " (pruned " + pruned + ").");
+        hookPlanAnalytics();
+        getLogger().info("Reload complete. Shops: " + shopManager.size() + ".");
+    }
+
+    private void hookPlanAnalytics() {
+        if (!pluginConfig.planAnalyticsEnabled()) {
+            if (planAnalytics != null) {
+                planAnalytics.shutdown();
+                planAnalytics = null;
+            }
+            return;
+        }
+        if (planAnalytics != null) {
+            return;
+        }
+        if (getServer().getPluginManager().getPlugin("Plan") == null) {
+            getLogger().fine("Plan is not installed; ItemShops Plan analytics integration skipped.");
+            return;
+        }
+        try {
+            PlanAnalyticsHook hook = new PlanAnalyticsHook(this, analyticsStore);
+            hook.hookIntoPlan();
+            planAnalytics = hook;
+        } catch (NoClassDefFoundError e) {
+            getLogger().fine("Plan API is unavailable; ItemShops Plan analytics integration skipped.");
+        } catch (Throwable t) {
+            getLogger().warning("Failed to enable ItemShops Plan analytics integration: " + t.getMessage());
+        }
     }
 
     public void enableBreakDelete(UUID playerId, long durationMs) {

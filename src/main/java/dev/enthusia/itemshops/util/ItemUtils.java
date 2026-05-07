@@ -30,11 +30,19 @@ public final class ItemUtils {
         return String.join(" ", parts);
     }
 
-    public static Material matchMaterial(String query){
-        if (query == null) return null;
-        String q = query.trim().toUpperCase(Locale.ROOT).replace(' ','_');
-        try { return Material.valueOf(q); } catch (Exception ignored) { return null; }
-    }
+    public static Material matchMaterial(String query){
+        if (query == null) return null;
+        String q = query.trim().toUpperCase(Locale.ROOT).replace(' ','_');
+        try { return Material.valueOf(q); } catch (Exception ignored) { return null; }
+    }
+
+    public static boolean couldBeSign(Material material) {
+        return material != null && material.name().endsWith("_SIGN");
+    }
+
+    public static boolean couldBeConfiguredContainer(Material material, Set<Material> allowed) {
+        return material != null && allowed != null && allowed.contains(material);
+    }
 
     
 
