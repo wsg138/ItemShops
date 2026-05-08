@@ -364,6 +364,10 @@ public final class ShopManager {
         return signService.ownerName(ownerId);
     }
 
+    public String cachedOwnerNameIfKnown(UUID ownerId) {
+        return signService.cachedOwnerNameIfKnown(ownerId);
+    }
+
     public void indexExisting(Shop shop) {
         registry.indexExisting(shop);
     }

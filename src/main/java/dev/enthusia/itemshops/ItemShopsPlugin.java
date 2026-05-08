@@ -241,6 +241,10 @@ public final class ItemShopsPlugin extends JavaPlugin {
             shopManager.saveNow();
         }
         storage.reloadFile();
+        if (shopManager != null) {
+            shopManager.loadFromStorage();
+            getLogger().info("Reloaded shop storage from disk after saving current in-memory state.");
+        }
         if (analyticsStore != null) {
             analyticsStore.reload();
         }

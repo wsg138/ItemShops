@@ -124,4 +124,14 @@ public final class ShopSignService {
         cacheOwnerName(ownerId);
         return ownerNameCache.getOrDefault(ownerId, "Unknown");
     }
+
+    public String cachedOwnerNameIfKnown(UUID ownerId) {
+        if (ownerId == null) return null;
+        Player online = Bukkit.getPlayer(ownerId);
+        if (online != null) {
+            ownerNameCache.put(ownerId, online.getName());
+            return online.getName();
+        }
+        return ownerNameCache.get(ownerId);
+    }
 }

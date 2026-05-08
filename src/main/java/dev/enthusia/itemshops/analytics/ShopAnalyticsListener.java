@@ -7,7 +7,6 @@ import dev.enthusia.itemshops.events.ShopDeletedEvent;
 import dev.enthusia.itemshops.events.ShopStockDepletedEvent;
 import dev.enthusia.itemshops.model.Shop;
 import dev.enthusia.itemshops.util.ItemUtils;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -114,8 +113,7 @@ public final class ShopAnalyticsListener implements Listener {
         if (online != null) {
             return online.getName();
         }
-        OfflinePlayer offline = plugin.getServer().getOfflinePlayer(playerId);
-        String name = offline.getName();
-        return name == null ? playerId.toString() : name;
+        String cached = plugin.shops() == null ? null : plugin.shops().cachedOwnerNameIfKnown(playerId);
+        return cached == null || cached.isBlank() ? playerId.toString() : cached;
     }
 }

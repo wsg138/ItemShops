@@ -1,6 +1,6 @@
 name: ItemShops
 main: dev.enthusia.itemshops.ItemShopsPlugin
-version: 1.7.1
+version: 1.7.2
 api-version: '1.21'
 softdepend: [ARM-Guilds-Bridge, LumaGuilds, WorldGuard, Vault, Plan]
 author: Enthusia

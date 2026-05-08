@@ -26,10 +26,12 @@ The codebase has already had its main release-hardening pass:
    - Leaf/Paper 1.21.x
    - Java 21
    - same plugin set you expect in production, especially guild-related plugins if used
+   - any Badger-authored dependent plugins that listen for ItemShops events or call the added integration APIs
 2. Use at least 2 normal player accounts and 1 admin account.
 3. Run tests once with no guild plugins present and once with the guild stack present if guild shops matter to your server.
-4. Keep `debug.removals: true` during staging so unexpected cleanup is visible in console.
-5. Delete old beta shop data if you want a clean verification pass. This build is intended for fresh-format validation rather than legacy migration coverage.
+4. Run at least one pass with the actual dependent plugins Badger built against this plugin, because API compatibility is present here but real runtime verification still matters.
+5. Keep `debug.removals: true` during staging so unexpected cleanup is visible in console.
+6. Delete old beta shop data if you want a clean verification pass. This build is intended for fresh-format validation rather than legacy migration coverage.
 
 ## Ordered Manual Testing Checklist
 
@@ -235,6 +237,11 @@ The codebase has already had its main release-hardening pass:
 - If running without guild plugins:
   - confirm ItemShops still starts cleanly
   - confirm no guild features interfere with normal shops
+- If running with Badger-authored dependent plugins that hook into ItemShops:
+  - confirm they enable cleanly with this build
+  - confirm there are no missing-class, missing-method, or event-registration errors at startup
+  - confirm any features that depend on `PreShopTransactionEvent`, `PostShopTransactionEvent`, `ShopCreatedEvent`, `ShopDeletedEvent`, `ShopStockDepletedEvent`, or `GuildShopIntegration` still behave as expected
+  - confirm any plugin that modifies transaction pricing through the pre-transaction event still reaches the intended end result in live purchases
 - If running with `ARM-Guilds-Bridge` and `LumaGuilds`:
   - confirm startup reports guild integration enabled
   - confirm guild shop recognition works
