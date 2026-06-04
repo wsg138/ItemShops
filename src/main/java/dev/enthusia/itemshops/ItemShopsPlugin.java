@@ -36,8 +36,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 
-public final class ItemShopsPlugin extends JavaPlugin {
+public class ItemShopsPlugin extends JavaPlugin {
 
     private static ItemShopsPlugin instance;
 
@@ -174,8 +175,7 @@ public final class ItemShopsPlugin extends JavaPlugin {
                 shopManager.shutdown();
             }
         } catch (Exception e) {
-            getLogger().severe("Failed to save shops: " + e.getMessage());
-            e.printStackTrace();
+            getLogger().log(Level.SEVERE, "Failed to save shops during disable.", e);
         }
         if (vaultManager != null) {
             vaultManager.saveNow();

@@ -18,6 +18,8 @@ public final class ItemShopsConfig {
     private Set<Material> allowedContainers = Collections.emptySet();
     private int signUpdateBatchPerRun;
     private long signUpdateRunDelayTicks;
+    private String storageType;
+    private String sqliteFileName;
     private String storageFileName;
     private boolean defaultHopperAllowIn;
     private boolean defaultHopperAllowOut;
@@ -45,6 +47,12 @@ public final class ItemShopsConfig {
         maxShopsPerContainer = Math.max(1, plugin.getConfig().getInt("max-shops-per-container", 2));
         oneOwnerPerContainer = plugin.getConfig().getBoolean("one-owner-per-container", true);
         outsideSpacingRadius = Math.max(0, plugin.getConfig().getInt("market.outside-spacing-radius", 1));
+        storageType = plugin.getConfig().getString("storage.type", "sqlite").trim().toLowerCase(Locale.ROOT);
+        if (!storageType.equals("sqlite") && !storageType.equals("yaml")) {
+            plugin.getLogger().warning("Unknown storage.type '" + storageType + "'; using sqlite.");
+            storageType = "sqlite";
+        }
+        sqliteFileName = plugin.getConfig().getString("storage.sqlite.file", "itemshops.db");
         storageFileName = plugin.getConfig().getString("storage.file", "shops.yml");
         defaultHopperAllowIn = plugin.getConfig().getBoolean("hoppers.default-allow-in", false);
         defaultHopperAllowOut = plugin.getConfig().getBoolean("hoppers.default-allow-out", false);
@@ -115,6 +123,18 @@ public final class ItemShopsConfig {
 
     public long signUpdateRunDelayTicks() {
         return signUpdateRunDelayTicks;
+    }
+
+    public String storageType() {
+        return storageType;
+    }
+
+    public boolean useSqliteStorage() {
+        return "sqlite".equals(storageType);
+    }
+
+    public String sqliteFileName() {
+        return sqliteFileName;
     }
 
     public String storageFileName() {

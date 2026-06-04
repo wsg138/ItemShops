@@ -9,6 +9,7 @@ import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.Method;
 import java.util.UUID;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class GuildShopIntegration {
@@ -108,8 +109,7 @@ public class GuildShopIntegration {
             logger.info("- Income from guild shops routes to guild vault");
         } catch (Exception e) {
             enabled = false;
-            logger.warning("Failed to initialize guild shop integration: " + e.getMessage());
-            e.printStackTrace();
+            logger.log(Level.WARNING, "Failed to initialize guild shop integration.", e);
         }
     }
 
@@ -162,8 +162,7 @@ public class GuildShopIntegration {
             logger.info("Routed " + amount + " from ItemShop to guild " + guildId + " (buyer: " + buyer.getName() + ")");
             return true;
         } catch (Exception e) {
-            logger.severe("Failed to route shop income to guild vault: " + e.getMessage());
-            e.printStackTrace();
+            logger.log(Level.SEVERE, "Failed to route shop income to guild vault.", e);
             return false;
         }
     }

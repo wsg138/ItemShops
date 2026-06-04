@@ -16,17 +16,22 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.logging.Level;
 
 public final class ShopStorage {
     private static final long SAVE_DEBOUNCE_TICKS = 40L;
+    private static final DateTimeFormatter BACKUP_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final ItemShopsPlugin plugin;
     private final ItemShopsConfig pluginConfig;
     private final MarketRegionManager marketRegionManager;
+    private final SqliteItemShopsDatabase sqliteDatabase;
 
     private File file;
     private FileConfiguration cfg;
@@ -40,6 +45,8 @@ public final class ShopStorage {
         this.marketRegionManager = marketRegionManager;
         resetFileHandle();
         this.cfg = YamlConfiguration.loadConfiguration(file);
+        this.sqliteDatabase = pluginConfig.useSqliteStorage() ? new SqliteItemShopsDatabase(plugin, pluginConfig) : null;
+        migrateYamlToSqliteIfNeeded();
     }
 
     public synchronized void reloadFile() {
@@ -77,6 +84,17 @@ public final class ShopStorage {
     }
 
     public synchronized List<Shop> loadAll() {
+        if (sqliteDatabase != null) {
+            List<Shop> shops = new ArrayList<>();
+            for (StoredShop storedShop : sqliteDatabase.loadShops()) {
+                Shop shop = storedShop.toShop();
+                if (shop != null) {
+                    shops.add(shop);
+                }
+            }
+            return shops;
+        }
+
         List<Shop> shops = new ArrayList<>();
         ConfigurationSection root = cfg.getConfigurationSection("shops");
         if (root == null) return shops;
@@ -91,6 +109,15 @@ public final class ShopStorage {
     }
 
     public synchronized Shop loadOneBySign(Pos signPos) {
+        if (sqliteDatabase != null) {
+            for (Shop shop : loadAll()) {
+                if (shop.sign().equals(signPos)) {
+                    return shop;
+                }
+            }
+            return null;
+        }
+
         ConfigurationSection root = cfg.getConfigurationSection("shops");
         if (root == null) return null;
 
@@ -151,28 +178,35 @@ public final class ShopStorage {
     }
 
     private void writeSnapshot(List<StoredShop> snapshot) {
+        if (sqliteDatabase != null) {
+            if (sqliteDatabase.saveShops(snapshot)) {
+                plugin.performance().storageSaveWritten.increment();
+            }
+            return;
+        }
+
         FileConfiguration out = new YamlConfiguration();
         int index = 0;
         for (StoredShop shop : snapshot) {
             String key = "shops." + index++;
-            out.set(key + ".id", shop.id.toString());
-            out.set(key + ".sign.world", shop.sign.world);
-            out.set(key + ".sign.x", shop.sign.x);
-            out.set(key + ".sign.y", shop.sign.y);
-            out.set(key + ".sign.z", shop.sign.z);
-            out.set(key + ".container.world", shop.container.world);
-            out.set(key + ".container.x", shop.container.x);
-            out.set(key + ".container.y", shop.container.y);
-            out.set(key + ".container.z", shop.container.z);
-            out.set(key + ".owner", shop.owner.toString());
-            out.set(key + ".sell", shop.sell);
-            out.set(key + ".cost", shop.cost);
-            out.set(key + ".trusted", shop.trusted.stream().map(UUID::toString).toList());
-            out.set(key + ".hopper.allow_in", shop.hopperAllowIn);
-            out.set(key + ".hopper.allow_out", shop.hopperAllowOut);
-            out.set(key + ".search.enabled", shop.searchEnabled);
-            out.set(key + ".freeze.enabled", shop.frozen);
-            out.set(key + ".freeze.until_ms", shop.frozenUntilMs);
+            out.set(key + ".id", shop.id().toString());
+            out.set(key + ".sign.world", shop.sign().world);
+            out.set(key + ".sign.x", shop.sign().x);
+            out.set(key + ".sign.y", shop.sign().y);
+            out.set(key + ".sign.z", shop.sign().z);
+            out.set(key + ".container.world", shop.container().world);
+            out.set(key + ".container.x", shop.container().x);
+            out.set(key + ".container.y", shop.container().y);
+            out.set(key + ".container.z", shop.container().z);
+            out.set(key + ".owner", shop.owner().toString());
+            out.set(key + ".sell", shop.sell());
+            out.set(key + ".cost", shop.cost());
+            out.set(key + ".trusted", shop.trusted().stream().map(UUID::toString).toList());
+            out.set(key + ".hopper.allow_in", shop.hopperAllowIn());
+            out.set(key + ".hopper.allow_out", shop.hopperAllowOut());
+            out.set(key + ".search.enabled", shop.searchEnabled());
+            out.set(key + ".freeze.enabled", shop.frozen());
+            out.set(key + ".freeze.until_ms", shop.frozenUntilMs());
         }
 
         File tmp = new File(file.getParentFile(), file.getName() + ".tmp");
@@ -192,6 +226,59 @@ public final class ShopStorage {
             if (tmp.exists() && !tmp.equals(file)) {
                 tmp.delete();
             }
+        }
+    }
+
+    private void migrateYamlToSqliteIfNeeded() {
+        if (sqliteDatabase == null || sqliteDatabase.hasMeta("shops-yaml-imported") || !sqliteDatabase.shopsEmpty()) {
+            return;
+        }
+        List<Shop> legacyShops = loadYamlShops();
+        if (legacyShops.isEmpty()) {
+            sqliteDatabase.markMeta("shops-yaml-imported", "empty");
+            return;
+        }
+        List<StoredShop> snapshot = buildSnapshot(legacyShops);
+        sqliteDatabase.saveShops(snapshot);
+        sqliteDatabase.markMeta("shops-yaml-imported", "imported " + snapshot.size() + " shops");
+        backupLegacyYaml(file);
+        plugin.getLogger().info("Imported " + snapshot.size() + " shops from " + file.getName() + " into SQLite storage.");
+    }
+
+    private List<Shop> loadYamlShops() {
+        List<Shop> shops = new ArrayList<>();
+        ConfigurationSection root = cfg.getConfigurationSection("shops");
+        if (root == null) {
+            return shops;
+        }
+        for (String key : root.getKeys(false)) {
+            ConfigurationSection section = root.getConfigurationSection(key);
+            if (section == null) {
+                continue;
+            }
+            Shop shop = deserializeShop(section);
+            if (shop != null) {
+                shops.add(shop);
+            }
+        }
+        return shops;
+    }
+
+    private void backupLegacyYaml(File source) {
+        if (source == null || !source.exists() || source.length() <= 0L) {
+            return;
+        }
+        File backupDir = new File(plugin.getDataFolder(), "backups");
+        if (!backupDir.exists() && !backupDir.mkdirs()) {
+            plugin.getLogger().warning("Could not create backups folder for " + source.getName() + ".");
+            return;
+        }
+        File backup = new File(backupDir, source.getName() + ".sqlite-import-" + LocalDateTime.now().format(BACKUP_STAMP) + ".bak");
+        try {
+            Files.copy(source.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            plugin.getLogger().info("Backed up legacy " + source.getName() + " to " + backup.getName() + ".");
+        } catch (IOException exception) {
+            plugin.getLogger().log(Level.WARNING, "Failed to back up legacy " + source.getName() + ".", exception);
         }
     }
 
@@ -254,61 +341,4 @@ public final class ShopStorage {
         return shop;
     }
 
-    private static final class StoredShop {
-        private final UUID id;
-        private final Pos sign;
-        private final Pos container;
-        private final UUID owner;
-        private final ItemStack sell;
-        private final ItemStack cost;
-        private final List<UUID> trusted;
-        private final boolean hopperAllowIn;
-        private final boolean hopperAllowOut;
-        private final boolean searchEnabled;
-        private final boolean frozen;
-        private final long frozenUntilMs;
-
-        private StoredShop(UUID id,
-                           Pos sign,
-                           Pos container,
-                           UUID owner,
-                           ItemStack sell,
-                           ItemStack cost,
-                           List<UUID> trusted,
-                           boolean hopperAllowIn,
-                           boolean hopperAllowOut,
-                           boolean searchEnabled,
-                           boolean frozen,
-                           long frozenUntilMs) {
-            this.id = id;
-            this.sign = sign;
-            this.container = container;
-            this.owner = owner;
-            this.sell = sell;
-            this.cost = cost;
-            this.trusted = trusted;
-            this.hopperAllowIn = hopperAllowIn;
-            this.hopperAllowOut = hopperAllowOut;
-            this.searchEnabled = searchEnabled;
-            this.frozen = frozen;
-            this.frozenUntilMs = frozenUntilMs;
-        }
-
-        private static StoredShop from(Shop shop) {
-            return new StoredShop(
-                    shop.id(),
-                    shop.sign(),
-                    shop.container(),
-                    shop.owner(),
-                    shop.sell() == null ? null : shop.sell().clone(),
-                    shop.cost() == null ? null : shop.cost().clone(),
-                    new ArrayList<>(shop.trusted()),
-                    shop.isHopperAllowIn(),
-                    shop.isHopperAllowOut(),
-                    shop.isSearchEnabled(),
-                    shop.isFrozen(),
-                    shop.frozenUntilMs()
-            );
-        }
-    }
 }

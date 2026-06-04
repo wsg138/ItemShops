@@ -78,6 +78,13 @@ safety:
     period-ticks: 1
 
 storage:
+  # sqlite is the intended production target. Existing shops.yml and vault.yml
+  # are imported automatically the first time sqlite storage starts empty.
+  type: sqlite
+  sqlite:
+    file: "itemshops.db"
+
+  # Legacy YAML shop file. Kept as the automatic import source for existing servers.
   file: "shops.yml"
 
 analytics:

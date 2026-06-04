@@ -1,6 +1,7 @@
 package dev.enthusia.itemshops.vault;
 
 import dev.enthusia.itemshops.ItemShopsPlugin;
+import dev.enthusia.itemshops.data.SqliteItemShopsDatabase;
 import dev.enthusia.itemshops.util.ItemUtils;
 import org.bukkit.entity.Player;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -14,11 +15,15 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 
 public final class VaultManager {
-    public static final long RETENTION_SECONDS = 7L * 24L * 60L * 60L;
+    public static final long RETENTION_SECONDS = 7L * 24L * 60L * 60L;
+    private static final DateTimeFormatter BACKUP_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     public static final class VaultEntry {
         public final UUID owner;
@@ -35,6 +40,7 @@ public final class VaultManager {
     
     private final Map<UUID, List<VaultEntry>> entries = new ConcurrentHashMap<>();
     private final File file;
+    private final SqliteItemShopsDatabase sqliteDatabase;
     private FileConfiguration cfg;
     private BukkitTask pendingSaveTask;
     private BukkitTask pendingAsyncWriteTask;
@@ -45,6 +51,10 @@ public final class VaultManager {
         this.file = new File(plugin.getDataFolder(), "vault.yml");
         ensureFile();
         this.cfg = YamlConfiguration.loadConfiguration(file);
+        this.sqliteDatabase = plugin.pluginConfig().useSqliteStorage()
+                ? new SqliteItemShopsDatabase(plugin, plugin.pluginConfig())
+                : null;
+        migrateYamlToSqliteIfNeeded();
         loadAll();
     }
 
@@ -136,6 +146,18 @@ public final class VaultManager {
 
     private void loadAll() {
         entries.clear();
+        if (sqliteDatabase != null) {
+            long now = Instant.now().getEpochSecond();
+            for (VaultEntry entry : sqliteDatabase.loadVaultEntries()) {
+                if (entry.amount <= 0 || entry.expiresAt <= now) {
+                    continue;
+                }
+                entries.computeIfAbsent(entry.owner, ignored -> new ArrayList<>())
+                        .add(new VaultEntry(entry.owner, entry.item.clone(), entry.amount, entry.expiresAt));
+            }
+            return;
+        }
+
         var root = cfg.getConfigurationSection("vault");
         if (root == null) return;
         long now = Instant.now().getEpochSecond();
@@ -178,6 +200,15 @@ public final class VaultManager {
     }
 
     private void saveAll(Map<UUID, List<VaultEntry>> snapshot) {
+        if (sqliteDatabase != null) {
+            List<VaultEntry> flattened = new ArrayList<>();
+            for (List<VaultEntry> list : snapshot.values()) {
+                flattened.addAll(list);
+            }
+            sqliteDatabase.saveVaultEntries(flattened);
+            return;
+        }
+
         FileConfiguration out = new YamlConfiguration();
         for (var entry : snapshot.entrySet()) {
             String key = entry.getKey().toString();
@@ -220,5 +251,84 @@ public final class VaultManager {
                 saveAll(snapshot);
             });
         }, SAVE_DEBOUNCE_TICKS);
+    }
+
+    private void migrateYamlToSqliteIfNeeded() {
+        if (sqliteDatabase == null || sqliteDatabase.hasMeta("vault-yaml-imported") || !sqliteDatabase.vaultEmpty()) {
+            return;
+        }
+        Map<UUID, List<VaultEntry>> legacyEntries = loadYamlSnapshot();
+        if (legacyEntries.isEmpty()) {
+            sqliteDatabase.markMeta("vault-yaml-imported", "empty");
+            return;
+        }
+        List<VaultEntry> flattened = new ArrayList<>();
+        for (List<VaultEntry> list : legacyEntries.values()) {
+            flattened.addAll(list);
+        }
+        sqliteDatabase.saveVaultEntries(flattened);
+        sqliteDatabase.markMeta("vault-yaml-imported", "imported " + flattened.size() + " entries");
+        backupLegacyYaml();
+        plugin.getLogger().info("Imported " + flattened.size() + " vault entries from vault.yml into SQLite storage.");
+    }
+
+    private Map<UUID, List<VaultEntry>> loadYamlSnapshot() {
+        Map<UUID, List<VaultEntry>> snapshot = new LinkedHashMap<>();
+        var root = cfg.getConfigurationSection("vault");
+        if (root == null) {
+            return snapshot;
+        }
+        long now = Instant.now().getEpochSecond();
+        for (String key : root.getKeys(false)) {
+            UUID owner;
+            try {
+                owner = UUID.fromString(key);
+            } catch (IllegalArgumentException exception) {
+                continue;
+            }
+            List<Map<?, ?>> list = cfg.getMapList("vault." + key);
+            if (list.isEmpty()) {
+                continue;
+            }
+            List<VaultEntry> out = new ArrayList<>();
+            for (Map<?, ?> map : list) {
+                Object itemObj = map.get("item");
+                Object amountObj = map.get("amount");
+                Object expiresObj = map.get("expiresAt");
+                if (!(itemObj instanceof ItemStack item)
+                        || !(amountObj instanceof Number amount)
+                        || !(expiresObj instanceof Number expiresAt)) {
+                    continue;
+                }
+                int count = amount.intValue();
+                long expires = expiresAt.longValue();
+                if (count <= 0 || expires <= now) {
+                    continue;
+                }
+                out.add(new VaultEntry(owner, item.clone(), count, expires));
+            }
+            if (!out.isEmpty()) {
+                snapshot.put(owner, out);
+            }
+        }
+        return snapshot;
+    }
+
+    private void backupLegacyYaml() {
+        if (!file.exists() || file.length() <= 0L) {
+            return;
+        }
+        File backupDir = new File(plugin.getDataFolder(), "backups");
+        if (!backupDir.exists() && !backupDir.mkdirs()) {
+            plugin.getLogger().warning("Could not create backups folder for vault.yml.");
+            return;
+        }
+        File backup = new File(backupDir, file.getName() + ".sqlite-import-" + LocalDateTime.now().format(BACKUP_STAMP) + ".bak");
+        try {
+            Files.copy(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            plugin.getLogger().info("Backed up legacy vault.yml to " + backup.getName() + ".");
+        } catch (IOException exception) {
+            plugin.getLogger().log(Level.WARNING, "Failed to back up legacy vault.yml.", exception);
+        }
     }
 }
