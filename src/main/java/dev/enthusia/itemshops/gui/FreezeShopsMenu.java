@@ -5,7 +5,6 @@ import dev.enthusia.itemshops.manager.ShopManager;
 import dev.enthusia.itemshops.model.Shop;
 import dev.enthusia.itemshops.util.Bedrock;
 import dev.enthusia.itemshops.util.ItemUtils;
-import dev.enthusia.itemshops.util.Texts;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
@@ -29,7 +28,6 @@ public final class FreezeShopsMenu implements ShopMenu {
     private static final int PER_PAGE = 45;
     private static final int PREV = 45, CLOSE = 49, NEXT = 53;
 
-    private final ItemShopsPlugin plugin;
     private final ShopManager mgr;
     private final Player viewer;
     private final UUID target;
@@ -37,10 +35,9 @@ public final class FreezeShopsMenu implements ShopMenu {
     private final boolean bedrockViewer;
     private final Inventory inv;
     private List<Shop> shops;
-    private int page = 0;
+    private int page;
 
     public FreezeShopsMenu(ItemShopsPlugin plugin, ShopManager mgr, Player viewer, UUID target, long durationMs) {
-        this.plugin = plugin;
         this.mgr = mgr;
         this.viewer = viewer;
         this.target = target;
@@ -113,38 +110,65 @@ public final class FreezeShopsMenu implements ShopMenu {
     }
 
     @Override public boolean onClick(InventoryClickEvent e){
-        int raw = e.getRawSlot(); boolean top = raw < inv.getSize();
-
-        if (top) {
-            e.setCancelled(true);
-            if (raw == CLOSE) { viewer.closeInventory(); return true; }
-            if (raw == PREV && page>0) { page--; render(); return true; }
-            if (raw == NEXT && (page+1)*PER_PAGE < shops.size()) { page++; render(); return true; }
-            if (raw >=0 && raw < PER_PAGE && inv.getItem(raw)!=null) {
-                int idx = page*PER_PAGE + raw; if (idx >= shops.size()) return true;
-                Shop s = shops.get(idx);
-                if (s.isFrozen()) {
-                    mgr.unfreezeShop(s);
-                    viewer.sendMessage(ItemUtils.colored("&eUnfroze shop."));
-                } else {
-                    long untilMs = durationMs > 0 ? System.currentTimeMillis() + durationMs : 0L;
-                    mgr.freezeShop(s, untilMs);
-                    viewer.sendMessage(ItemUtils.colored("&eFroze shop."));
-                }
-                render();
-                return true;
-            }
-            return true;
-        } else {
-            if (e.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
-                    || e.getAction() == InventoryAction.HOTBAR_SWAP
-                    || e.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD
-                    || e.getClick()  == ClickType.NUMBER_KEY) {
-                e.setCancelled(true);
-                return true;
-            }
-            return false;
+        int raw = e.getRawSlot();
+        if (raw >= inv.getSize()) {
+            return cancelUnsafePlayerInventoryClick(e);
         }
+        e.setCancelled(true);
+        if (handleNavigation(raw)) {
+            return true;
+        }
+        return handleShopToggle(raw);
+    }
+
+    private boolean handleNavigation(int raw) {
+        if (raw == CLOSE) {
+            viewer.closeInventory();
+            return true;
+        }
+        if (raw == PREV && page > 0) {
+            page--;
+            render();
+            return true;
+        }
+        if (raw == NEXT && (page + 1) * PER_PAGE < shops.size()) {
+            page++;
+            render();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleShopToggle(int raw) {
+        if (raw < 0 || raw >= PER_PAGE || inv.getItem(raw) == null) {
+            return true;
+        }
+        int idx = page * PER_PAGE + raw;
+        if (idx >= shops.size()) {
+            return true;
+        }
+        Shop shop = shops.get(idx);
+        if (shop.isFrozen()) {
+            mgr.unfreezeShop(shop);
+            viewer.sendMessage(ItemUtils.colored("&eUnfroze shop."));
+        } else {
+            long untilMs = durationMs > 0 ? System.currentTimeMillis() + durationMs : 0L;
+            mgr.freezeShop(shop, untilMs);
+            viewer.sendMessage(ItemUtils.colored("&eFroze shop."));
+        }
+        render();
+        return true;
+    }
+
+    private boolean cancelUnsafePlayerInventoryClick(InventoryClickEvent e) {
+        if (e.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
+                || e.getAction() == InventoryAction.HOTBAR_SWAP
+                || e.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD
+                || e.getClick() == ClickType.NUMBER_KEY) {
+            e.setCancelled(true);
+            return true;
+        }
+        return false;
     }
 
     @Override public boolean onDrag(InventoryDragEvent e){ e.setCancelled(true); return true; }

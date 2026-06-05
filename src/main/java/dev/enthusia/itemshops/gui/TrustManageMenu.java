@@ -26,20 +26,19 @@ public final class TrustManageMenu implements ShopMenu {
     private static final int PER_PAGE = 45;
     private static final int PREV = 45, TOGGLE_ALL = 48, CLOSE = 50, NEXT = 53;
 
-    private final ItemShopsPlugin plugin;
-    private final ShopManager mgr;
+    private final ShopManager mgr;
     private final Player owner;
     private final UUID target;
     private final String targetName;
     private List<Shop> shops;
 
-    private final boolean bedrockViewer;
-
-    private final Inventory inv;
-    private int page = 0;
-
-    public TrustManageMenu(ItemShopsPlugin plugin, ShopManager mgr, Player owner, UUID target, String targetName) {
-        this.plugin = plugin; this.mgr = mgr; this.owner = owner; this.target = target; this.targetName = targetName;
+    private final boolean bedrockViewer;
+
+    private final Inventory inv;
+    private int page;
+
+    public TrustManageMenu(ItemShopsPlugin plugin, ShopManager mgr, Player owner, UUID target, String targetName) {
+        this.mgr = mgr; this.owner = owner; this.target = target; this.targetName = targetName;
         this.bedrockViewer = Bedrock.isBedrock(owner);
 
         this.shops = mgr.ownedBy(owner.getUniqueId());
@@ -95,42 +94,72 @@ public final class TrustManageMenu implements ShopMenu {
         }
     }
 
-    @Override public boolean onClick(InventoryClickEvent e){
-        int raw = e.getRawSlot(); boolean top = raw < inv.getSize();
-
-        if (top) {
-            e.setCancelled(true);
-            if (raw == CLOSE) { owner.closeInventory(); return true; }
-            if (raw == PREV && page>0) { page--; render(); return true; }
-            if (raw == NEXT && (page+1)*PER_PAGE < shops.size()) { page++; render(); return true; }
-            if (raw == TOGGLE_ALL) {
-                long trustedCount = shops.stream().filter(this::isTrusted).count();
-                boolean trust = trustedCount < (shops.size()/2.0);
-                mgr.setTrusted(shops, target, trust);
-                owner.sendMessage(ItemUtils.colored("&a"+(trust ? "Trusted " : "Untrusted ")+targetName+" for all your shops."));
-                render();
-                return true;
-            }
-            if (raw >=0 && raw < PER_PAGE && inv.getItem(raw)!=null) {
-                int idx = page*PER_PAGE + raw; if (idx >= shops.size()) return true;
-                Shop s = shops.get(idx);
-                boolean now = !isTrusted(s);
-                setTrusted(s, now);
-                render();
-                return true;
-            }
-            return true;
-        } else {
-            if (e.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
-                    || e.getAction() == InventoryAction.HOTBAR_SWAP
-                    || e.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD
-                    || e.getClick()  == ClickType.NUMBER_KEY) {
-                e.setCancelled(true);
-                return true;
-            }
-            return false;
-        }
-    }
+    @Override public boolean onClick(InventoryClickEvent e){
+        int raw = e.getRawSlot();
+        if (raw >= inv.getSize()) {
+            return cancelUnsafePlayerInventoryClick(e);
+        }
+        e.setCancelled(true);
+        if (handleNavigation(raw) || handleBulkToggle(raw)) {
+            return true;
+        }
+        return handleShopToggle(raw);
+    }
+
+    private boolean handleNavigation(int raw) {
+        if (raw == CLOSE) {
+            owner.closeInventory();
+            return true;
+        }
+        if (raw == PREV && page > 0) {
+            page--;
+            render();
+            return true;
+        }
+        if (raw == NEXT && (page + 1) * PER_PAGE < shops.size()) {
+            page++;
+            render();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleBulkToggle(int raw) {
+        if (raw != TOGGLE_ALL) {
+            return false;
+        }
+        long trustedCount = shops.stream().filter(this::isTrusted).count();
+        boolean trust = trustedCount < (shops.size() / 2.0);
+        mgr.setTrusted(shops, target, trust);
+        owner.sendMessage(ItemUtils.colored("&a" + (trust ? "Trusted " : "Untrusted ") + targetName + " for all your shops."));
+        render();
+        return true;
+    }
+
+    private boolean handleShopToggle(int raw) {
+        if (raw < 0 || raw >= PER_PAGE || inv.getItem(raw) == null) {
+            return true;
+        }
+        int idx = page * PER_PAGE + raw;
+        if (idx >= shops.size()) {
+            return true;
+        }
+        Shop shop = shops.get(idx);
+        setTrusted(shop, !isTrusted(shop));
+        render();
+        return true;
+    }
+
+    private boolean cancelUnsafePlayerInventoryClick(InventoryClickEvent e) {
+        if (e.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
+                || e.getAction() == InventoryAction.HOTBAR_SWAP
+                || e.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD
+                || e.getClick() == ClickType.NUMBER_KEY) {
+            e.setCancelled(true);
+            return true;
+        }
+        return false;
+    }
 
     @Override public boolean onDrag(InventoryDragEvent e){ e.setCancelled(true); return true; }
     @Override public void onClose(InventoryCloseEvent e){ }

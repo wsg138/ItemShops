@@ -99,35 +99,62 @@ public final class DeleteShopsMenu implements ShopMenu {
     }
 
     @Override public boolean onClick(InventoryClickEvent e){
-        int raw = e.getRawSlot(); boolean top = raw < inv.getSize();
-
-        if (top) {
-            e.setCancelled(true);
-            if (raw == CLOSE) { viewer.closeInventory(); return true; }
-            if (raw == PREV && page>0) { page--; render(); return true; }
-            if (raw == NEXT && (page+1)*PER_PAGE < shops.size()) { page++; render(); return true; }
-            if (raw >=0 && raw < PER_PAGE && inv.getItem(raw)!=null) {
-                int idx = page*PER_PAGE + raw; if (idx >= shops.size()) return true;
-                Shop s = shops.get(idx);
-                boolean canDelete = viewer.hasPermission("itemshops.admin") || s.owner().equals(viewer.getUniqueId());
-                if (!canDelete) {
-                    viewer.sendMessage(Texts.msg(plugin.messages(), "errors.not-owner"));
-                    return true;
-                }
-                new DeleteConfirmMenu(plugin, mgr, viewer, s, showAll, page).open();
-                return true;
-            }
-            return true;
-        } else {
-            if (e.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
-                    || e.getAction() == InventoryAction.HOTBAR_SWAP
-                    || e.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD
-                    || e.getClick()  == ClickType.NUMBER_KEY) {
-                e.setCancelled(true);
-                return true;
-            }
-            return false;
+        int raw = e.getRawSlot();
+        if (raw >= inv.getSize()) {
+            return cancelUnsafePlayerInventoryClick(e);
         }
+        e.setCancelled(true);
+        if (handleNavigation(raw)) {
+            return true;
+        }
+        return handleShopSelection(raw);
+    }
+
+    private boolean handleNavigation(int raw) {
+        if (raw == CLOSE) {
+            viewer.closeInventory();
+            return true;
+        }
+        if (raw == PREV && page > 0) {
+            page--;
+            render();
+            return true;
+        }
+        if (raw == NEXT && (page + 1) * PER_PAGE < shops.size()) {
+            page++;
+            render();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleShopSelection(int raw) {
+        if (raw < 0 || raw >= PER_PAGE || inv.getItem(raw) == null) {
+            return true;
+        }
+        int idx = page * PER_PAGE + raw;
+        if (idx >= shops.size()) {
+            return true;
+        }
+        Shop shop = shops.get(idx);
+        boolean canDelete = viewer.hasPermission("itemshops.admin") || shop.owner().equals(viewer.getUniqueId());
+        if (!canDelete) {
+            viewer.sendMessage(Texts.msg(plugin.messages(), "errors.not-owner"));
+            return true;
+        }
+        new DeleteConfirmMenu(plugin, mgr, viewer, shop, showAll, page).open();
+        return true;
+    }
+
+    private boolean cancelUnsafePlayerInventoryClick(InventoryClickEvent e) {
+        if (e.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
+                || e.getAction() == InventoryAction.HOTBAR_SWAP
+                || e.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD
+                || e.getClick() == ClickType.NUMBER_KEY) {
+            e.setCancelled(true);
+            return true;
+        }
+        return false;
     }
 
     @Override public boolean onDrag(InventoryDragEvent e){ e.setCancelled(true); return true; }
