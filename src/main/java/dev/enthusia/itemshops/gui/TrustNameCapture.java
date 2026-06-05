@@ -10,7 +10,8 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Map;
-import java.util.UUID;
+import java.util.UUID;
+import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
@@ -114,7 +115,7 @@ public final class TrustNameCapture implements Listener {
             t = t.substring(1);
         }
         
-        return t.replace(" ", "").replace("_", "").toLowerCase();
+        return t.replace(" ", "").replace("_", "").toLowerCase(Locale.ROOT);
     }
 
     private static String color(String s) {

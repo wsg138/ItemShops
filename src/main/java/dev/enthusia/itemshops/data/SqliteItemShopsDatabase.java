@@ -98,11 +98,11 @@ public final class SqliteItemShopsDatabase {
     }
 
     public synchronized boolean shopsEmpty() {
-        return tableEmpty("shops");
+        return tableEmpty("shops", "SELECT 1 FROM shops LIMIT 1");
     }
 
     public synchronized boolean vaultEmpty() {
-        return tableEmpty("vault_entries");
+        return tableEmpty("vault_entries", "SELECT 1 FROM vault_entries LIMIT 1");
     }
 
     public synchronized void markMeta(String key, String value) {
@@ -217,9 +217,9 @@ public final class SqliteItemShopsDatabase {
         return DriverManager.getConnection(jdbcUrl);
     }
 
-    private boolean tableEmpty(String table) {
+    private boolean tableEmpty(String table, String sql) {
         try (Connection connection = open();
-             PreparedStatement statement = connection.prepareStatement("SELECT 1 FROM " + table + " LIMIT 1");
+             PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet resultSet = statement.executeQuery()) {
             return !resultSet.next();
         } catch (SQLException exception) {

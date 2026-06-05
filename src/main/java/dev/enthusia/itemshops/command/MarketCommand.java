@@ -12,7 +12,8 @@ import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
+import java.util.List;
+import java.util.Locale;
 
 public final class MarketCommand implements CommandExecutor, TabCompleter {
     private final ItemShopsPlugin plugin;
@@ -32,7 +33,7 @@ public final class MarketCommand implements CommandExecutor, TabCompleter {
         }
 
         MarketRegionManager mr = plugin.market();
-        String sub = args[0].toLowerCase();
+        String sub = args[0].toLowerCase(Locale.ROOT);
 
         switch (sub) {
             case "set" -> {
