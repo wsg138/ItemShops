@@ -38,7 +38,7 @@ public final class PlanAnalyticsHook implements AnalyticsIntegration {
             ExtensionService.getInstance().unregister(extension);
         } catch (IllegalStateException ignored) {
             // Plan may already be disabled during server shutdown.
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
             plugin.getLogger().fine("Failed to unregister ItemShops Plan extension: " + t.getMessage());
         } finally {
             registered = false;
@@ -65,7 +65,7 @@ public final class PlanAnalyticsHook implements AnalyticsIntegration {
             plugin.getLogger().fine("Plan is not ready for ItemShops analytics registration.");
         } catch (IllegalArgumentException e) {
             plugin.getLogger().warning("Invalid ItemShops Plan analytics extension: " + e.getMessage());
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
             plugin.getLogger().warning("Failed to register ItemShops Plan analytics integration: " + t.getMessage());
         }
     }

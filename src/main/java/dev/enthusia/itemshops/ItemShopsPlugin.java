@@ -285,7 +285,7 @@ public class ItemShopsPlugin extends JavaPlugin {
             planAnalytics = hook;
         } catch (NoClassDefFoundError e) {
             getLogger().fine("Plan API is unavailable; ItemShops Plan analytics integration skipped.");
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
             getLogger().warning("Failed to enable ItemShops Plan analytics integration: " + t.getMessage());
         }
     }
