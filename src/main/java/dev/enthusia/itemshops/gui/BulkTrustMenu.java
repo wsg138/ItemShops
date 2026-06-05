@@ -1,7 +1,6 @@
 package dev.enthusia.itemshops.gui;
 
-import dev.enthusia.itemshops.ItemShopsPlugin;
-import dev.enthusia.itemshops.manager.ShopManager;
+import dev.enthusia.itemshops.manager.ShopManager;
 import dev.enthusia.itemshops.model.Shop;
 import dev.enthusia.itemshops.util.Bedrock;
 import dev.enthusia.itemshops.util.ItemUtils;
@@ -26,8 +25,7 @@ public final class BulkTrustMenu implements ShopMenu {
     private static final int PER_PAGE = 45;
     private static final int PREV = 45, TOGGLE_ALL = 48, CLOSE = 50, NEXT = 53;
 
-    private final ItemShopsPlugin plugin;
-    private final ShopManager mgr;
+    private final ShopManager mgr;
     private final Player owner;
     private final UUID target;
     private final String targetName;
@@ -36,11 +34,10 @@ public final class BulkTrustMenu implements ShopMenu {
 
     private List<Shop> shops;
     private final Inventory inv;
-    private int page = 0;
-
-    public BulkTrustMenu(ItemShopsPlugin plugin, ShopManager mgr, Player owner, UUID target, String targetName) {
-        this.plugin = plugin;
-        this.mgr = mgr;
+    private int page;
+
+    public BulkTrustMenu(ShopManager mgr, Player owner, UUID target, String targetName) {
+        this.mgr = mgr;
         this.owner = owner;
         this.target = target;
         this.targetName = targetName;

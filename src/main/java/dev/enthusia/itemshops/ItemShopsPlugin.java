@@ -134,7 +134,7 @@ public class ItemShopsPlugin extends JavaPlugin {
             getCommand("itemshops").setTabCompleter(mainCmd);
         }
 
-        ShopHelpCommand helpCmd = new ShopHelpCommand(this);
+        ShopHelpCommand helpCmd = new ShopHelpCommand();
         if (getCommand("shophelp") != null) {
             getCommand("shophelp").setExecutor(helpCmd);
             getCommand("shophelp").setTabCompleter(helpCmd);

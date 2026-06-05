@@ -37,7 +37,7 @@ public final class FreezeShopsMenu implements ShopMenu {
     private List<Shop> shops;
     private int page;
 
-    public FreezeShopsMenu(ItemShopsPlugin plugin, ShopManager mgr, Player viewer, UUID target, long durationMs) {
+    public FreezeShopsMenu(ShopManager mgr, Player viewer, UUID target, long durationMs) {
         this.mgr = mgr;
         this.viewer = viewer;
         this.target = target;

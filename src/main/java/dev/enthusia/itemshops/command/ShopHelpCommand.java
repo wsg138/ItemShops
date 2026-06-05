@@ -1,7 +1,6 @@
 package dev.enthusia.itemshops.command;
 
-import dev.enthusia.itemshops.ItemShopsPlugin;
-import dev.enthusia.itemshops.util.ItemUtils;
+import dev.enthusia.itemshops.util.ItemUtils;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.ComponentBuilder;
@@ -16,13 +15,7 @@ import org.bukkit.entity.Player;
 import java.util.Collections;
 import java.util.List;
 
-public final class ShopHelpCommand implements CommandExecutor, TabCompleter {
-
-    private final ItemShopsPlugin plugin;
-
-    public ShopHelpCommand(ItemShopsPlugin plugin) {
-        this.plugin = plugin;
-    }
+public final class ShopHelpCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {

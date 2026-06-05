@@ -1,7 +1,6 @@
 package dev.enthusia.itemshops.gui;
 
-import dev.enthusia.itemshops.ItemShopsPlugin;
-import dev.enthusia.itemshops.manager.ShopManager;
+import dev.enthusia.itemshops.manager.ShopManager;
 import dev.enthusia.itemshops.model.Shop;
 import dev.enthusia.itemshops.util.Bedrock;
 import dev.enthusia.itemshops.util.ItemUtils;
@@ -37,7 +36,7 @@ public final class TrustManageMenu implements ShopMenu {
     private final Inventory inv;
     private int page;
 
-    public TrustManageMenu(ItemShopsPlugin plugin, ShopManager mgr, Player owner, UUID target, String targetName) {
+    public TrustManageMenu(ShopManager mgr, Player owner, UUID target, String targetName) {
         this.mgr = mgr; this.owner = owner; this.target = target; this.targetName = targetName;
         this.bedrockViewer = Bedrock.isBedrock(owner);
 

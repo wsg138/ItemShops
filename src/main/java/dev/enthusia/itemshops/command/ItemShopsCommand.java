@@ -108,7 +108,7 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(ItemUtils.colored("&aTrusted &f"+name+"&a for all your shops."));
                 return true;
             }
-            new BulkTrustMenu(ItemShopsPlugin.get(), mgr, p, op.getUniqueId(), name).open();
+            new BulkTrustMenu(mgr, p, op.getUniqueId(), name).open();
             return true;
         }
 
@@ -124,7 +124,7 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(ItemUtils.colored("&eUntrusted &f"+name+"&e for all your shops."));
                 return true;
             }
-            new BulkTrustMenu(ItemShopsPlugin.get(), mgr, p, op.getUniqueId(), name).open();
+            new BulkTrustMenu(mgr, p, op.getUniqueId(), name).open();
             return true;
         }
 
@@ -319,7 +319,7 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
                 OfflinePlayer op = Bukkit.getOfflinePlayer(args[2]);
                 if (op == null || (op.getName()==null && !op.hasPlayedBefore())) { sender.sendMessage(ItemUtils.colored("&cUnknown player.")); return true; }
                 long menuDurationMs = args.length >= 4 ? parseDurationMs(args[3], 0L) : 0L;
-                new FreezeShopsMenu(ItemShopsPlugin.get(), mgr, p, op.getUniqueId(), menuDurationMs).open();
+                new FreezeShopsMenu(mgr, p, op.getUniqueId(), menuDurationMs).open();
                 return true;
             }
             OfflinePlayer op = Bukkit.getOfflinePlayer(args[1]);
@@ -346,7 +346,7 @@ public final class ItemShopsCommand implements CommandExecutor, TabCompleter {
                 if (args.length < 3) { sender.sendMessage(ItemUtils.colored("&eUsage: /itemshops unfreeze menu <player>")); return true; }
                 OfflinePlayer op = Bukkit.getOfflinePlayer(args[2]);
                 if (op == null || (op.getName()==null && !op.hasPlayedBefore())) { sender.sendMessage(ItemUtils.colored("&cUnknown player.")); return true; }
-                new FreezeShopsMenu(ItemShopsPlugin.get(), mgr, p, op.getUniqueId(), 0L).open();
+                new FreezeShopsMenu(mgr, p, op.getUniqueId(), 0L).open();
                 return true;
             }
             OfflinePlayer op = Bukkit.getOfflinePlayer(args[1]);
