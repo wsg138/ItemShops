@@ -34,7 +34,7 @@ public final class RecoveryListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInteract(PlayerInteractEvent e) {
-        if (e.getAction() != Action.LEFT_CLICK_BLOCK && e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (!isSignClick(e)) return;
 
         Block clicked = e.getClickedBlock();
         if (clicked == null || !ItemUtils.couldBeSign(clicked.getType())) {
@@ -45,41 +45,66 @@ public final class RecoveryListener implements Listener {
 
         Pos signPos = Pos.of(clicked.getLocation());
         Shop indexed = mgr.getBySign(signPos);
-        if (indexed != null) {
-            if (isBlank(sign)) {
-                mgr.updateSign(indexed);
-            }
+        if (refreshIndexedSign(indexed, sign)) {
             return;
         }
 
+        if (relinkAttachedContainer(sign, signPos, e.getPlayer())) {
+            return;
+        }
+
+        recoverFromStorage(signPos, e.getPlayer());
+    }
+
+    private boolean isSignClick(PlayerInteractEvent event) {
+        return event.getAction() == Action.LEFT_CLICK_BLOCK || event.getAction() == Action.RIGHT_CLICK_BLOCK;
+    }
+
+    private boolean refreshIndexedSign(Shop indexed, Sign sign) {
+        if (indexed == null) {
+            return false;
+        }
+        if (isBlank(sign)) {
+            mgr.updateSign(indexed);
+        }
+        return true;
+    }
+
+    private boolean relinkAttachedContainer(Sign sign, Pos signPos, Player player) {
         Block containerBlock = mgr.findAttachedContainer(sign);
-        if (containerBlock != null && containerBlock.getState() instanceof Container) {
-            Pos containerPos = mgr.unifyContainerPos(containerBlock);
-            List<Shop> containerShops = mgr.shopsOn(containerPos);
-            if (containerShops.size() == 1) {
-                Shop onlyShop = containerShops.get(0);
-                if (canSafelyRelink(onlyShop, signPos)) {
-                    mgr.relinkSign(onlyShop.sign(), signPos, onlyShop);
-                    mgr.updateSign(onlyShop);
-                    Player player = e.getPlayer();
-                    if (player != null) {
-                        player.sendMessage(ItemUtils.colored("&eRepaired shop sign link."));
-                    }
-                    plugin.performance().recoveryActions.increment();
-                    return;
-                }
-            }
+        if (containerBlock == null || !(containerBlock.getState() instanceof Container)) {
+            return false;
         }
-
-        Shop loaded = storage.loadOneBySign(signPos);
-        if (loaded == null) return;
-
-        mgr.put(loaded);
-        Player player = e.getPlayer();
-        if (player != null) {
-            player.sendMessage(ItemUtils.colored("&eRecovered shop from disk."));
+        Pos containerPos = mgr.unifyContainerPos(containerBlock);
+        List<Shop> containerShops = mgr.shopsOn(containerPos);
+        if (containerShops.size() != 1) {
+            return false;
         }
+        Shop onlyShop = containerShops.get(0);
+        if (!canSafelyRelink(onlyShop, signPos)) {
+            return false;
+        }
+        mgr.relinkSign(onlyShop.sign(), signPos, onlyShop);
+        mgr.updateSign(onlyShop);
+        sendRecoveryMessage(player, "&eRepaired shop sign link.");
         plugin.performance().recoveryActions.increment();
+        return true;
+    }
+
+    private void recoverFromStorage(Pos signPos, Player player) {
+        Shop loaded = storage.loadOneBySign(signPos);
+        if (loaded == null) {
+            return;
+        }
+        mgr.put(loaded);
+        sendRecoveryMessage(player, "&eRecovered shop from disk.");
+        plugin.performance().recoveryActions.increment();
+    }
+
+    private void sendRecoveryMessage(Player player, String message) {
+        if (player != null) {
+            player.sendMessage(ItemUtils.colored(message));
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
