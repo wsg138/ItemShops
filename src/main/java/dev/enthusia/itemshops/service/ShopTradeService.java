@@ -15,6 +15,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.List;
+
 public final class ShopTradeService {
     private final ItemShopsPlugin plugin;
     private final ShopManager shopManager;
@@ -35,98 +37,42 @@ public final class ShopTradeService {
         var lock = shop.lock();
         lock.lock();
         try {
-            Block contBlock = shop.container().toLocation() == null ? null : shop.container().toLocation().getBlock();
-            if (contBlock == null || !(contBlock.getState() instanceof Container cont)) {
+            Container cont = getShopContainer(shop);
+            if (cont == null) {
                 return TradeResult.failed("errors.unsafe");
             }
 
-            long nowMs = System.currentTimeMillis();
-            if (shop.clearIfFreezeExpired(nowMs)) {
-                shopManager.requestSave();
-            }
-            if (shop.isFrozen(nowMs)) {
+            if (isFrozen(shop)) {
                 return TradeResult.failed("errors.shop-frozen");
             }
 
-            Location shopLocation = shop.container().toLocation();
-            String regionId = "unknown";
-            String worldName = "unknown";
-            if (shopLocation != null && shopLocation.getWorld() != null) {
-                worldName = shopLocation.getWorld().getName();
-                regionId = worldName + ":" + shopLocation.getBlockX() + ":" + shopLocation.getBlockY() + ":" + shopLocation.getBlockZ();
-            }
+            TradeContext context = buildContext(shop);
 
             Inventory contInv = cont.getInventory();
             ItemStack sellT = shop.sell();
             ItemStack costT = shop.cost();
             int sellAmt = sellT.getAmount() * trades;
             int costAmt = costT.getAmount() * trades;
-            double originalPrice = computeEventPrice(costT, costAmt, shopLocation);
 
-            PreShopTransactionEvent preEvent = new PreShopTransactionEvent(
-                    buyer,
-                    regionId,
-                    worldName,
-                    sellT,
-                    trades,
-                    originalPrice
-            );
-            Bukkit.getPluginManager().callEvent(preEvent);
+            PreShopTransactionEvent preEvent = callPreTransaction(buyer, context, sellT, costT, costAmt, trades);
             if (preEvent.isCancelled()) {
                 return TradeResult.failed(null);
             }
 
-            int chargedCostAmt = resolveChargedCostAmount(costT, costAmt, preEvent, shopLocation);
-            double pricePaid = computeEventPrice(costT, chargedCostAmt, shopLocation);
-
-            int stock = ItemUtils.countSimilar(contInv, sellT);
-            if (stock < sellAmt) {
-                return TradeResult.failed("errors.stock-empty");
+            int chargedCostAmt = resolveChargedCostAmount(costT, costAmt, preEvent, context.location());
+            TradeResult validationFailure = validateInventories(buyer.getInventory(), contInv, sellT, costT, sellAmt, chargedCostAmt);
+            if (validationFailure != null) {
+                return validationFailure;
             }
 
-            Inventory buyerInv = buyer.getInventory();
-            int have = ItemUtils.countSimilar(buyerInv, costT);
-            if (have < chargedCostAmt) {
-                return TradeResult.failed("errors.payer-lacks");
-            }
-
-            if (!ItemUtils.canFit(buyerInv, sellT, sellAmt)) {
-                return TradeResult.failed("errors.buyer-space");
-            }
-
-            var removedFromCont = ItemUtils.removeSimilar(contInv, sellT, sellAmt);
-            int removedContAmt = removedFromCont.stream().mapToInt(ItemStack::getAmount).sum();
-            if (removedContAmt < sellAmt) {
-                if (!removedFromCont.isEmpty()) {
-                    ItemUtils.rollbackRemove(contInv, sellT, removedFromCont);
-                }
+            RemovalResult removal = removeTradeItems(buyer.getInventory(), contInv, sellT, costT, sellAmt, chargedCostAmt);
+            if (!removal.success()) {
                 return TradeResult.failed("errors.transaction-failed");
             }
 
-            var removedFromBuyer = ItemUtils.removeSimilar(buyerInv, costT, chargedCostAmt);
-            int removedBuyerAmt = removedFromBuyer.stream().mapToInt(ItemStack::getAmount).sum();
-            if (removedBuyerAmt < chargedCostAmt) {
-                if (!removedFromBuyer.isEmpty()) {
-                    ItemUtils.rollbackRemove(buyerInv, costT, removedFromBuyer);
-                }
-                ItemUtils.rollbackRemove(contInv, sellT, removedFromCont);
-                return TradeResult.failed("errors.transaction-failed");
-            }
+            ItemUtils.addExact(buyer.getInventory(), sellT, sellAmt);
 
-            ItemUtils.addExact(buyerInv, sellT, sellAmt);
-
-            boolean routed = false;
-            if (plugin.guildShops() != null && plugin.guildShops().isEnabled()) {
-                if (shopLocation != null && plugin.guildShops().isGuildShop(shopLocation) && plugin.guildShops().isPhysicalCurrency(costT)) {
-                    int value = plugin.guildShops().calculateCurrencyValue(costT, chargedCostAmt);
-                    if (value > 0) {
-                        routed = plugin.guildShops().routeShopIncome(shopLocation, (double) value, buyer);
-                    }
-                }
-            }
-            if (!routed) {
-                plugin.vault().deposit(shop.owner(), costT, chargedCostAmt);
-            }
+            routeIncomeOrDeposit(shop, buyer, context.location(), costT, chargedCostAmt);
 
             int remainingStock = ItemUtils.countSimilar(contInv, sellT);
             shopManager.refreshCachedTrades(shop);
@@ -137,11 +83,11 @@ public final class ShopTradeService {
             Bukkit.getPluginManager().callEvent(new PostShopTransactionEvent(
                     buyer,
                     shop.owner(),
-                    regionId,
-                    worldName,
+                    context.regionId(),
+                    context.worldName(),
                     sellT,
                     trades,
-                    pricePaid
+                    computeEventPrice(costT, chargedCostAmt, context.location())
             ));
 
             shopManager.requestSignRefresh(shop);
@@ -149,6 +95,109 @@ public final class ShopTradeService {
         } finally {
             lock.unlock();
         }
+    }
+
+    private Container getShopContainer(Shop shop) {
+        Location containerLocation = shop.container().toLocation();
+        Block contBlock = containerLocation == null ? null : containerLocation.getBlock();
+        if (contBlock == null || !(contBlock.getState() instanceof Container cont)) {
+            return null;
+        }
+        return cont;
+    }
+
+    private boolean isFrozen(Shop shop) {
+        long nowMs = System.currentTimeMillis();
+        if (shop.clearIfFreezeExpired(nowMs)) {
+            shopManager.requestSave();
+        }
+        return shop.isFrozen(nowMs);
+    }
+
+    private TradeContext buildContext(Shop shop) {
+        Location shopLocation = shop.container().toLocation();
+        if (shopLocation == null || shopLocation.getWorld() == null) {
+            return new TradeContext(shopLocation, "unknown", "unknown");
+        }
+        String worldName = shopLocation.getWorld().getName();
+        String regionId = worldName + ":" + shopLocation.getBlockX() + ":" + shopLocation.getBlockY() + ":" + shopLocation.getBlockZ();
+        return new TradeContext(shopLocation, regionId, worldName);
+    }
+
+    private PreShopTransactionEvent callPreTransaction(
+        Player buyer,
+        TradeContext context,
+        ItemStack sellItem,
+        ItemStack costItem,
+        int costAmount,
+        int trades
+    ) {
+        PreShopTransactionEvent preEvent = new PreShopTransactionEvent(
+            buyer,
+            context.regionId(),
+            context.worldName(),
+            sellItem,
+            trades,
+            computeEventPrice(costItem, costAmount, context.location())
+        );
+        Bukkit.getPluginManager().callEvent(preEvent);
+        return preEvent;
+    }
+
+    private TradeResult validateInventories(Inventory buyerInv, Inventory contInv, ItemStack sellItem, ItemStack costItem, int sellAmount, int chargedCostAmount) {
+        if (ItemUtils.countSimilar(contInv, sellItem) < sellAmount) {
+            return TradeResult.failed("errors.stock-empty");
+        }
+        if (ItemUtils.countSimilar(buyerInv, costItem) < chargedCostAmount) {
+            return TradeResult.failed("errors.payer-lacks");
+        }
+        if (!ItemUtils.canFit(buyerInv, sellItem, sellAmount)) {
+            return TradeResult.failed("errors.buyer-space");
+        }
+        return null;
+    }
+
+    private RemovalResult removeTradeItems(Inventory buyerInv, Inventory contInv, ItemStack sellItem, ItemStack costItem, int sellAmount, int chargedCostAmount) {
+        List<ItemStack> removedFromCont = ItemUtils.removeSimilar(contInv, sellItem, sellAmount);
+        if (totalAmount(removedFromCont) < sellAmount) {
+            rollbackIfNeeded(contInv, sellItem, removedFromCont);
+            return RemovalResult.failed();
+        }
+
+        List<ItemStack> removedFromBuyer = ItemUtils.removeSimilar(buyerInv, costItem, chargedCostAmount);
+        if (totalAmount(removedFromBuyer) < chargedCostAmount) {
+            rollbackIfNeeded(buyerInv, costItem, removedFromBuyer);
+            ItemUtils.rollbackRemove(contInv, sellItem, removedFromCont);
+            return RemovalResult.failed();
+        }
+        return RemovalResult.succeeded();
+    }
+
+    private int totalAmount(List<ItemStack> items) {
+        return items.stream().mapToInt(ItemStack::getAmount).sum();
+    }
+
+    private void rollbackIfNeeded(Inventory inventory, ItemStack template, List<ItemStack> removedItems) {
+        if (!removedItems.isEmpty()) {
+            ItemUtils.rollbackRemove(inventory, template, removedItems);
+        }
+    }
+
+    private void routeIncomeOrDeposit(Shop shop, Player buyer, Location shopLocation, ItemStack costItem, int chargedCostAmount) {
+        if (!routeGuildIncome(buyer, shopLocation, costItem, chargedCostAmount)) {
+            plugin.vault().deposit(shop.owner(), costItem, chargedCostAmount);
+        }
+    }
+
+    private boolean routeGuildIncome(Player buyer, Location shopLocation, ItemStack costItem, int chargedCostAmount) {
+        if (plugin.guildShops() == null || !plugin.guildShops().isEnabled() || shopLocation == null) {
+            return false;
+        }
+        if (!plugin.guildShops().isGuildShop(shopLocation) || !plugin.guildShops().isPhysicalCurrency(costItem)) {
+            return false;
+        }
+        int value = plugin.guildShops().calculateCurrencyValue(costItem, chargedCostAmount);
+        return value > 0 && plugin.guildShops().routeShopIncome(shopLocation, (double) value, buyer);
     }
 
     private double computeEventPrice(ItemStack costItem, int costAmount, Location shopLocation) {
@@ -161,6 +210,19 @@ public final class ShopTradeService {
             if (value > 0) return value;
         }
         return costAmount;
+    }
+
+    private record TradeContext(Location location, String regionId, String worldName) {
+    }
+
+    private record RemovalResult(boolean success) {
+        private static RemovalResult succeeded() {
+            return new RemovalResult(true);
+        }
+
+        private static RemovalResult failed() {
+            return new RemovalResult(false);
+        }
     }
 
     private int resolveChargedCostAmount(ItemStack costItem, int defaultCostAmount, PreShopTransactionEvent preEvent, Location shopLocation) {
