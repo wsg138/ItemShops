@@ -103,35 +103,41 @@ public final class ItemUtils {
     }
 
     
-    public static void rollbackRemove(Inventory inv, ItemStack template, List<ItemStack> removed){
-        for (ItemStack r : removed) addExact(inv, r, r.getAmount());
-    }
-
-    
-    public static void addExact(Inventory inv, ItemStack template, int amount){
-        if (template == null || template.getType().isAir() || amount <= 0) return;
-        int max = template.getMaxStackSize();
-        int left = amount;
-
-        
-        for (int i=0;i<inv.getSize() && left>0;i++){
-            ItemStack cur = inv.getItem(i);
-            if (cur == null || cur.getType().isAir()) continue;
-            if (!cur.isSimilar(template)) continue;
+    public static void rollbackRemove(Inventory inv, ItemStack template, List<ItemStack> removed){
+        for (ItemStack r : removed) addExact(inv, r, r.getAmount());
+    }
+
+    public static void addExact(Inventory inv, ItemStack template, int amount){
+        if (template == null || template.getType().isAir() || amount <= 0) return;
+        int max = template.getMaxStackSize();
+        int left = addToSimilarStacks(inv, template, amount, max);
+        addToEmptySlots(inv, template, left, max);
+    }
+
+    private static int addToSimilarStacks(Inventory inv, ItemStack template, int amount, int max) {
+        int left = amount;
+        for (int i=0;i<inv.getSize() && left>0;i++){
+            ItemStack cur = inv.getItem(i);
+            if (cur == null || cur.getType().isAir()) continue;
+            if (!cur.isSimilar(template)) continue;
             int can = max - cur.getAmount();
             if (can <= 0) continue;
             int add = Math.min(can, left);
-            cur.setAmount(cur.getAmount() + add);
-            left -= add;
-        }
-        
-        while (left > 0){
-            int put = Math.min(left, max);
-            ItemStack clone = template.clone(); clone.setAmount(put);
+            cur.setAmount(cur.getAmount() + add);
+            left -= add;
+        }
+        return left;
+    }
+
+    private static void addToEmptySlots(Inventory inv, ItemStack template, int amount, int max) {
+        int left = amount;
+        while (left > 0){
+            int put = Math.min(left, max);
+            ItemStack clone = template.clone(); clone.setAmount(put);
             inv.addItem(clone);
             left -= put;
         }
-    }
+    }
 
     
 

@@ -24,20 +24,19 @@ public final class SearchResultsMenu implements ShopMenu {
     private static final int HELP_SLOT  = 47;
     private static final int PER_PAGE   = 45;
 
-    private final ItemShopsPlugin plugin;
-    private final Player viewer;
-    private final List<Shop> results;
-    private final String queryDesc;
-    private final String mode;
-    private int page = 0;
+    private final ItemShopsPlugin plugin;
+    private final Player viewer;
+    private final List<Shop> results;
+    private final String mode;
+    private int page;
 
     
     private final boolean bedrockViewer;
 
-    private final Inventory inv;
-
-    public SearchResultsMenu(ItemShopsPlugin plugin, Player viewer, List<Shop> results, String queryDesc, String mode) {
-        this.plugin = plugin; this.viewer = viewer; this.results = results; this.queryDesc = queryDesc; this.mode = mode;
+    private final Inventory inv;
+
+    public SearchResultsMenu(ItemShopsPlugin plugin, Player viewer, List<Shop> results, String queryDesc, String mode) {
+        this.plugin = plugin; this.viewer = viewer; this.results = results; this.mode = mode;
 
         this.bedrockViewer = Bedrock.isBedrock(viewer);
         String titleTpl = plugin.getConfig().getString("gui.search-title","&6Shops for &e{query} &6({mode})");
@@ -112,37 +111,52 @@ public final class SearchResultsMenu implements ShopMenu {
     }
 
     @Override
-    public boolean onClick(InventoryClickEvent e) {
-        if (!e.getView().getTopInventory().equals(inv)) return false;
-        int raw = e.getRawSlot();
-        boolean top = raw < inv.getSize();
-        if (!top) return false;
-
-        e.setCancelled(true);
-
-        if (raw == NEXT_SLOT && (page + 1) * PER_PAGE < results.size()) { page++; render(); return true; }
-        if (raw == PREV_SLOT && page > 0) { page--; render(); return true; }
-        if (raw == CLOSE_SLOT) { viewer.closeInventory(); return true; }
-
-        if (raw >= 0 && raw < PER_PAGE) {
-            int idx = page * PER_PAGE + raw;
-            if (idx >= results.size()) return true;
-            Shop s = results.get(idx);
-
-            boolean isShulker = ItemUtils.isShulker(s.sell());
-
-            if (e.isRightClick()) {
-                if (isShulker) {
-                    new ShulkerPreviewMenu((Player) viewer, s).open();
-                } else {
-                    String coords = s.sign().world + " " + s.sign().x + " " + s.sign().y + " " + s.sign().z;
-                    viewer.sendMessage(ItemUtils.colored("&6[ItemShops]&r Coords: &f" + coords));
-                }
-                return true;
-            }
-        }
-        return true;
-    }
+    public boolean onClick(InventoryClickEvent e) {
+        if (!e.getView().getTopInventory().equals(inv)) return false;
+        int raw = e.getRawSlot();
+        if (raw >= inv.getSize()) return false;
+        e.setCancelled(true);
+        if (handleNavigation(raw)) {
+            return true;
+        }
+        return handleResultClick(e, raw);
+    }
+
+    private boolean handleNavigation(int raw) {
+        if (raw == NEXT_SLOT && (page + 1) * PER_PAGE < results.size()) {
+            page++;
+            render();
+            return true;
+        }
+        if (raw == PREV_SLOT && page > 0) {
+            page--;
+            render();
+            return true;
+        }
+        if (raw == CLOSE_SLOT) {
+            viewer.closeInventory();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleResultClick(InventoryClickEvent e, int raw) {
+        if (raw < 0 || raw >= PER_PAGE || !e.isRightClick()) {
+            return true;
+        }
+        int idx = page * PER_PAGE + raw;
+        if (idx >= results.size()) {
+            return true;
+        }
+        Shop shop = results.get(idx);
+        if (ItemUtils.isShulker(shop.sell())) {
+            new ShulkerPreviewMenu(viewer, shop).open();
+            return true;
+        }
+        String coords = shop.sign().world + " " + shop.sign().x + " " + shop.sign().y + " " + shop.sign().z;
+        viewer.sendMessage(ItemUtils.colored("&6[ItemShops]&r Coords: &f" + coords));
+        return true;
+    }
 
     @Override
     public boolean onDrag(InventoryDragEvent e) {
