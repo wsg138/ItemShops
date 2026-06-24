@@ -11,31 +11,31 @@ import java.util.Set;
 public final class ItemShopsConfig {
     private final ItemShopsPlugin plugin;
 
-    private int maxShopsPerPlayer;
-    private int maxShopsPerContainer;
-    private boolean oneOwnerPerContainer;
-    private int outsideSpacingRadius;
-    private Set<Material> allowedContainers = Collections.emptySet();
-    private int signUpdateBatchPerRun;
-    private long signUpdateRunDelayTicks;
-    private String storageType;
-    private String sqliteFileName;
-    private String storageFileName;
-    private boolean defaultHopperAllowIn;
-    private boolean defaultHopperAllowOut;
-    private boolean analyticsEnabled;
-    private String analyticsHistoryFileName;
-    private int analyticsRetentionDays;
-    private int analyticsRecentTableLimit;
-    private boolean planAnalyticsEnabled;
-    private boolean shopAuditEnabled;
-    private long shopAuditIntervalTicks;
-    private int shopAuditMaxShopsPerTick;
-    private boolean shopAuditRepairEnabled;
-    private boolean shopAuditReportOnly;
-    private boolean shopAuditDebugLogRepairs;
-    private boolean performanceDebugEnabled;
-    private long performanceLogIntervalTicks;
+    private int configuredMaxShopsPerPlayer;
+    private int configuredMaxShopsPerContainer;
+    private boolean configuredOneOwnerPerContainer;
+    private int configuredOutsideSpacingRadius;
+    private Set<Material> configuredAllowedContainers = Collections.emptySet();
+    private int configuredSignUpdateBatchPerRun;
+    private long configuredSignUpdateRunDelayTicks;
+    private String configuredStorageType;
+    private String configuredSqliteFileName;
+    private String configuredStorageFileName;
+    private boolean configuredDefaultHopperAllowIn;
+    private boolean configuredDefaultHopperAllowOut;
+    private boolean configuredAnalyticsEnabled;
+    private String configuredAnalyticsHistoryFileName;
+    private int configuredAnalyticsRetentionDays;
+    private int configuredAnalyticsRecentTableLimit;
+    private boolean configuredPlanAnalyticsEnabled;
+    private boolean configuredShopAuditEnabled;
+    private long configuredShopAuditIntervalTicks;
+    private int configuredShopAuditMaxShopsPerTick;
+    private boolean configuredShopAuditRepairEnabled;
+    private boolean configuredShopAuditReportOnly;
+    private boolean configuredShopAuditDebugLogRepairs;
+    private boolean configuredPerformanceDebugEnabled;
+    private long configuredPerformanceLogIntervalTicks;
 
     public ItemShopsConfig(ItemShopsPlugin plugin) {
         this.plugin = plugin;
@@ -43,42 +43,42 @@ public final class ItemShopsConfig {
     }
 
     public void reload() {
-        maxShopsPerPlayer = Math.max(1, plugin.getConfig().getInt("max-shops-per-player", 64));
-        maxShopsPerContainer = Math.max(1, plugin.getConfig().getInt("max-shops-per-container", 2));
-        oneOwnerPerContainer = plugin.getConfig().getBoolean("one-owner-per-container", true);
-        outsideSpacingRadius = Math.max(0, plugin.getConfig().getInt("market.outside-spacing-radius", 1));
-        storageType = plugin.getConfig().getString("storage.type", "sqlite").trim().toLowerCase(Locale.ROOT);
-        if (!storageType.equals("sqlite") && !storageType.equals("yaml")) {
-            plugin.getLogger().warning("Unknown storage.type '" + storageType + "'; using sqlite.");
-            storageType = "sqlite";
+        configuredMaxShopsPerPlayer = Math.max(1, plugin.getConfig().getInt("max-shops-per-player", 64));
+        configuredMaxShopsPerContainer = Math.max(1, plugin.getConfig().getInt("max-shops-per-container", 2));
+        configuredOneOwnerPerContainer = plugin.getConfig().getBoolean("one-owner-per-container", true);
+        configuredOutsideSpacingRadius = Math.max(0, plugin.getConfig().getInt("market.outside-spacing-radius", 1));
+        configuredStorageType = plugin.getConfig().getString("storage.type", "sqlite").trim().toLowerCase(Locale.ROOT);
+        if (!configuredStorageType.equals("sqlite") && !configuredStorageType.equals("yaml")) {
+            plugin.getLogger().warning("Unknown storage.type '" + configuredStorageType + "'; using sqlite.");
+            configuredStorageType = "sqlite";
         }
-        sqliteFileName = plugin.getConfig().getString("storage.sqlite.file", "itemshops.db");
-        storageFileName = plugin.getConfig().getString("storage.file", "shops.yml");
-        defaultHopperAllowIn = plugin.getConfig().getBoolean("hoppers.default-allow-in", false);
-        defaultHopperAllowOut = plugin.getConfig().getBoolean("hoppers.default-allow-out", false);
-        analyticsEnabled = plugin.getConfig().getBoolean("analytics.enabled", true);
-        analyticsHistoryFileName = plugin.getConfig().getString("analytics.history-file", "analytics.yml");
-        analyticsRetentionDays = Math.max(1, plugin.getConfig().getInt("analytics.retention-days", 30));
-        analyticsRecentTableLimit = Math.max(1, plugin.getConfig().getInt("analytics.recent-table-limit", 10));
-        planAnalyticsEnabled = plugin.getConfig().getBoolean("analytics.plan.enabled", true);
-        shopAuditEnabled = plugin.getConfig().getBoolean("shop-audit.enabled", true);
-        shopAuditIntervalTicks = Math.max(20L, plugin.getConfig().getLong("shop-audit.interval-minutes", 10L) * 60L * 20L);
-        shopAuditMaxShopsPerTick = Math.max(1, plugin.getConfig().getInt("shop-audit.max-shops-per-tick", 5));
-        shopAuditRepairEnabled = plugin.getConfig().getBoolean("shop-audit.repair-enabled", true);
-        shopAuditReportOnly = plugin.getConfig().getBoolean("shop-audit.report-only", false);
-        shopAuditDebugLogRepairs = plugin.getConfig().getBoolean("shop-audit.debug-log-repairs", false);
-        performanceDebugEnabled = plugin.getConfig().getBoolean("debug.performance.enabled", false);
-        performanceLogIntervalTicks = Math.max(20L, plugin.getConfig().getLong("debug.performance.log-interval-seconds", 300L) * 20L);
+        configuredSqliteFileName = plugin.getConfig().getString("storage.sqlite.file", "itemshops.db");
+        configuredStorageFileName = plugin.getConfig().getString("storage.file", "shops.yml");
+        configuredDefaultHopperAllowIn = plugin.getConfig().getBoolean("hoppers.default-allow-in", false);
+        configuredDefaultHopperAllowOut = plugin.getConfig().getBoolean("hoppers.default-allow-out", false);
+        configuredAnalyticsEnabled = plugin.getConfig().getBoolean("analytics.enabled", true);
+        configuredAnalyticsHistoryFileName = plugin.getConfig().getString("analytics.history-file", "analytics.yml");
+        configuredAnalyticsRetentionDays = Math.max(1, plugin.getConfig().getInt("analytics.retention-days", 30));
+        configuredAnalyticsRecentTableLimit = Math.max(1, plugin.getConfig().getInt("analytics.recent-table-limit", 10));
+        configuredPlanAnalyticsEnabled = plugin.getConfig().getBoolean("analytics.plan.enabled", true);
+        configuredShopAuditEnabled = plugin.getConfig().getBoolean("shop-audit.enabled", true);
+        configuredShopAuditIntervalTicks = Math.max(20L, plugin.getConfig().getLong("shop-audit.interval-minutes", 10L) * 60L * 20L);
+        configuredShopAuditMaxShopsPerTick = Math.max(1, plugin.getConfig().getInt("shop-audit.max-shops-per-tick", 5));
+        configuredShopAuditRepairEnabled = plugin.getConfig().getBoolean("shop-audit.repair-enabled", true);
+        configuredShopAuditReportOnly = plugin.getConfig().getBoolean("shop-audit.report-only", false);
+        configuredShopAuditDebugLogRepairs = plugin.getConfig().getBoolean("shop-audit.debug-log-repairs", false);
+        configuredPerformanceDebugEnabled = plugin.getConfig().getBoolean("debug.performance.enabled", false);
+        configuredPerformanceLogIntervalTicks = Math.max(20L, plugin.getConfig().getLong("debug.performance.log-interval-seconds", 300L) * 20L);
 
         // Support both the old broken nested path and the current runtime path.
-        signUpdateBatchPerRun = Math.max(
+        configuredSignUpdateBatchPerRun = Math.max(
                 1,
                 plugin.getConfig().getInt(
                         "sign-update.batch-per-run",
                         plugin.getConfig().getInt("safety.sign-update.max-per-tick", 200)
                 )
         );
-        signUpdateRunDelayTicks = Math.max(
+        configuredSignUpdateRunDelayTicks = Math.max(
                 1L,
                 plugin.getConfig().getLong(
                         "sign-update.run-delay-ticks",
@@ -94,110 +94,110 @@ public final class ItemShopsConfig {
             } catch (IllegalArgumentException ignored) {
             }
         }
-        allowedContainers = Collections.unmodifiableSet(containers);
+        configuredAllowedContainers = Collections.unmodifiableSet(containers);
     }
 
     public int maxShopsPerPlayer() {
-        return maxShopsPerPlayer;
+        return configuredMaxShopsPerPlayer;
     }
 
     public int maxShopsPerContainer() {
-        return maxShopsPerContainer;
+        return configuredMaxShopsPerContainer;
     }
 
     public boolean oneOwnerPerContainer() {
-        return oneOwnerPerContainer;
+        return configuredOneOwnerPerContainer;
     }
 
     public int outsideSpacingRadius() {
-        return outsideSpacingRadius;
+        return configuredOutsideSpacingRadius;
     }
 
     public Set<Material> allowedContainers() {
-        return allowedContainers;
+        return configuredAllowedContainers;
     }
 
     public int signUpdateBatchPerRun() {
-        return signUpdateBatchPerRun;
+        return configuredSignUpdateBatchPerRun;
     }
 
     public long signUpdateRunDelayTicks() {
-        return signUpdateRunDelayTicks;
+        return configuredSignUpdateRunDelayTicks;
     }
 
     public String storageType() {
-        return storageType;
+        return configuredStorageType;
     }
 
     public boolean useSqliteStorage() {
-        return "sqlite".equals(storageType);
+        return "sqlite".equals(configuredStorageType);
     }
 
     public String sqliteFileName() {
-        return sqliteFileName;
+        return configuredSqliteFileName;
     }
 
     public String storageFileName() {
-        return storageFileName;
+        return configuredStorageFileName;
     }
 
     public boolean defaultHopperAllowIn() {
-        return defaultHopperAllowIn;
+        return configuredDefaultHopperAllowIn;
     }
 
     public boolean defaultHopperAllowOut() {
-        return defaultHopperAllowOut;
+        return configuredDefaultHopperAllowOut;
     }
 
     public boolean analyticsEnabled() {
-        return analyticsEnabled;
+        return configuredAnalyticsEnabled;
     }
 
     public String analyticsHistoryFileName() {
-        return analyticsHistoryFileName;
+        return configuredAnalyticsHistoryFileName;
     }
 
     public int analyticsRetentionDays() {
-        return analyticsRetentionDays;
+        return configuredAnalyticsRetentionDays;
     }
 
     public int analyticsRecentTableLimit() {
-        return analyticsRecentTableLimit;
+        return configuredAnalyticsRecentTableLimit;
     }
 
     public boolean planAnalyticsEnabled() {
-        return planAnalyticsEnabled;
+        return configuredPlanAnalyticsEnabled;
     }
 
     public boolean shopAuditEnabled() {
-        return shopAuditEnabled;
+        return configuredShopAuditEnabled;
     }
 
     public long shopAuditIntervalTicks() {
-        return shopAuditIntervalTicks;
+        return configuredShopAuditIntervalTicks;
     }
 
     public int shopAuditMaxShopsPerTick() {
-        return shopAuditMaxShopsPerTick;
+        return configuredShopAuditMaxShopsPerTick;
     }
 
     public boolean shopAuditRepairEnabled() {
-        return shopAuditRepairEnabled;
+        return configuredShopAuditRepairEnabled;
     }
 
     public boolean shopAuditReportOnly() {
-        return shopAuditReportOnly;
+        return configuredShopAuditReportOnly;
     }
 
     public boolean shopAuditDebugLogRepairs() {
-        return shopAuditDebugLogRepairs;
+        return configuredShopAuditDebugLogRepairs;
     }
 
     public boolean performanceDebugEnabled() {
-        return performanceDebugEnabled;
+        return configuredPerformanceDebugEnabled;
     }
 
     public long performanceLogIntervalTicks() {
-        return performanceLogIntervalTicks;
+        return configuredPerformanceLogIntervalTicks;
     }
 }

@@ -15,40 +15,40 @@ public final class ShopAnalyticsRecord {
         STOCK_DEPLETED
     }
 
-    private final Type type;
-    private final long timestampMs;
-    private final UUID shopId;
-    private final UUID ownerId;
-    private final String ownerName;
-    private final UUID actorId;
-    private final String actorName;
-    private final String worldName;
-    private final String location;
-    private final String soldItem;
-    private final int soldAmount;
-    private final int trades;
-    private final double chargedValue;
-    private final String costItem;
-    private final int costAmount;
-    private final String reason;
+    private final Type recordType;
+    private final long recordTimestampMs;
+    private final UUID recordShopId;
+    private final UUID recordOwnerId;
+    private final String recordOwnerName;
+    private final UUID recordActorId;
+    private final String recordActorName;
+    private final String recordWorldName;
+    private final String recordLocation;
+    private final String recordSoldItem;
+    private final int recordSoldAmount;
+    private final int recordTrades;
+    private final double recordChargedValue;
+    private final String recordCostItem;
+    private final int recordCostAmount;
+    private final String recordReason;
 
     private ShopAnalyticsRecord(Builder builder) {
-        this.type = builder.type;
-        this.timestampMs = builder.timestampMs;
-        this.shopId = builder.shopId;
-        this.ownerId = builder.ownerId;
-        this.ownerName = clean(builder.ownerName);
-        this.actorId = builder.actorId;
-        this.actorName = clean(builder.actorName);
-        this.worldName = clean(builder.worldName);
-        this.location = clean(builder.location);
-        this.soldItem = clean(builder.soldItem);
-        this.soldAmount = Math.max(0, builder.soldAmount);
-        this.trades = Math.max(0, builder.trades);
-        this.chargedValue = Math.max(0.0D, builder.chargedValue);
-        this.costItem = clean(builder.costItem);
-        this.costAmount = Math.max(0, builder.costAmount);
-        this.reason = clean(builder.reason);
+        this.recordType = builder.builderType;
+        this.recordTimestampMs = builder.builderTimestampMs;
+        this.recordShopId = builder.builderShopId;
+        this.recordOwnerId = builder.builderOwnerId;
+        this.recordOwnerName = clean(builder.builderOwnerName);
+        this.recordActorId = builder.builderActorId;
+        this.recordActorName = clean(builder.builderActorName);
+        this.recordWorldName = clean(builder.builderWorldName);
+        this.recordLocation = clean(builder.builderLocation);
+        this.recordSoldItem = clean(builder.builderSoldItem);
+        this.recordSoldAmount = Math.max(0, builder.builderSoldAmount);
+        this.recordTrades = Math.max(0, builder.builderTrades);
+        this.recordChargedValue = Math.max(0.0D, builder.builderChargedValue);
+        this.recordCostItem = clean(builder.builderCostItem);
+        this.recordCostAmount = Math.max(0, builder.builderCostAmount);
+        this.recordReason = clean(builder.builderReason);
     }
 
     public static Builder builder(Type type, long timestampMs) {
@@ -56,91 +56,91 @@ public final class ShopAnalyticsRecord {
     }
 
     public Type type() {
-        return type;
+        return recordType;
     }
 
     public long timestampMs() {
-        return timestampMs;
+        return recordTimestampMs;
     }
 
     public UUID shopId() {
-        return shopId;
+        return recordShopId;
     }
 
     public UUID ownerId() {
-        return ownerId;
+        return recordOwnerId;
     }
 
     public String ownerName() {
-        return ownerName;
+        return recordOwnerName;
     }
 
     public UUID actorId() {
-        return actorId;
+        return recordActorId;
     }
 
     public String actorName() {
-        return actorName;
+        return recordActorName;
     }
 
     public String worldName() {
-        return worldName;
+        return recordWorldName;
     }
 
     public String location() {
-        return location;
+        return recordLocation;
     }
 
     public String soldItem() {
-        return soldItem;
+        return recordSoldItem;
     }
 
     public int soldAmount() {
-        return soldAmount;
+        return recordSoldAmount;
     }
 
     public int trades() {
-        return trades;
+        return recordTrades;
     }
 
     public double chargedValue() {
-        return chargedValue;
+        return recordChargedValue;
     }
 
     public String costItem() {
-        return costItem;
+        return recordCostItem;
     }
 
     public int costAmount() {
-        return costAmount;
+        return recordCostAmount;
     }
 
     public String reason() {
-        return reason;
+        return recordReason;
     }
 
     public boolean involves(UUID playerId) {
-        return playerId != null && (playerId.equals(ownerId) || playerId.equals(actorId));
+        return playerId != null && (playerId.equals(recordOwnerId) || playerId.equals(recordActorId));
     }
 
     public Map<String, Object> serialize() {
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("type", type.name());
-        map.put("timestampMs", timestampMs);
-        putUuid(map, "shopId", shopId);
-        putUuid(map, "ownerId", ownerId);
-        map.put("ownerName", ownerName);
-        putUuid(map, "actorId", actorId);
-        map.put("actorName", actorName);
-        map.put("worldName", worldName);
-        map.put("location", location);
-        map.put("soldItem", soldItem);
-        map.put("soldAmount", soldAmount);
-        map.put("trades", trades);
-        map.put("chargedValue", chargedValue);
-        map.put("costItem", costItem);
-        map.put("costAmount", costAmount);
-        map.put("reason", reason);
+        map.put("type", recordType.name());
+        map.put("timestampMs", recordTimestampMs);
+        putUuid(map, "shopId", recordShopId);
+        putUuid(map, "ownerId", recordOwnerId);
+        map.put("ownerName", recordOwnerName);
+        putUuid(map, "actorId", recordActorId);
+        map.put("actorName", recordActorName);
+        map.put("worldName", recordWorldName);
+        map.put("location", recordLocation);
+        map.put("soldItem", recordSoldItem);
+        map.put("soldAmount", recordSoldAmount);
+        map.put("trades", recordTrades);
+        map.put("chargedValue", recordChargedValue);
+        map.put("costItem", recordCostItem);
+        map.put("costAmount", recordCostAmount);
+        map.put("reason", recordReason);
         return map;
     }
 
@@ -195,87 +195,87 @@ public final class ShopAnalyticsRecord {
     }
 
     public static final class Builder {
-        private final Type type;
-        private final long timestampMs;
-        private UUID shopId;
-        private UUID ownerId;
-        private String ownerName;
-        private UUID actorId;
-        private String actorName;
-        private String worldName;
-        private String location;
-        private String soldItem;
-        private int soldAmount;
-        private int trades;
-        private double chargedValue;
-        private String costItem;
-        private int costAmount;
-        private String reason;
+        private final Type builderType;
+        private final long builderTimestampMs;
+        private UUID builderShopId;
+        private UUID builderOwnerId;
+        private String builderOwnerName;
+        private UUID builderActorId;
+        private String builderActorName;
+        private String builderWorldName;
+        private String builderLocation;
+        private String builderSoldItem;
+        private int builderSoldAmount;
+        private int builderTrades;
+        private double builderChargedValue;
+        private String builderCostItem;
+        private int builderCostAmount;
+        private String builderReason;
 
         private Builder(Type type, long timestampMs) {
-            this.type = type;
-            this.timestampMs = timestampMs;
+            this.builderType = type;
+            this.builderTimestampMs = timestampMs;
         }
 
         public Builder shopId(UUID shopId) {
-            this.shopId = shopId;
+            this.builderShopId = shopId;
             return this;
         }
 
         public Builder owner(UUID ownerId, String ownerName) {
-            this.ownerId = ownerId;
-            this.ownerName = ownerName;
+            this.builderOwnerId = ownerId;
+            this.builderOwnerName = ownerName;
             return this;
         }
 
         public Builder actor(UUID actorId, String actorName) {
-            this.actorId = actorId;
-            this.actorName = actorName;
+            this.builderActorId = actorId;
+            this.builderActorName = actorName;
             return this;
         }
 
         public Builder worldName(String worldName) {
-            this.worldName = worldName;
+            this.builderWorldName = worldName;
             return this;
         }
 
         public Builder location(String location) {
-            this.location = location;
+            this.builderLocation = location;
             return this;
         }
 
         public Builder soldItem(String soldItem) {
-            this.soldItem = soldItem;
+            this.builderSoldItem = soldItem;
             return this;
         }
 
         public Builder soldAmount(int soldAmount) {
-            this.soldAmount = soldAmount;
+            this.builderSoldAmount = soldAmount;
             return this;
         }
 
         public Builder trades(int trades) {
-            this.trades = trades;
+            this.builderTrades = trades;
             return this;
         }
 
         public Builder chargedValue(double chargedValue) {
-            this.chargedValue = chargedValue;
+            this.builderChargedValue = chargedValue;
             return this;
         }
 
         public Builder costItem(String costItem) {
-            this.costItem = costItem;
+            this.builderCostItem = costItem;
             return this;
         }
 
         public Builder costAmount(int costAmount) {
-            this.costAmount = costAmount;
+            this.builderCostAmount = costAmount;
             return this;
         }
 
         public Builder reason(String reason) {
-            this.reason = reason;
+            this.builderReason = reason;
             return this;
         }
 

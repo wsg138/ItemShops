@@ -98,11 +98,11 @@ public final class SqliteItemShopsDatabase {
     }
 
     public synchronized boolean shopsEmpty() {
-        return tableEmpty("shops", "SELECT 1 FROM shops LIMIT 1");
+        return tableEmpty(Table.SHOPS);
     }
 
     public synchronized boolean vaultEmpty() {
-        return tableEmpty("vault_entries", "SELECT 1 FROM vault_entries LIMIT 1");
+        return tableEmpty(Table.VAULT_ENTRIES);
     }
 
     public synchronized void markMeta(String key, String value) {
@@ -217,14 +217,35 @@ public final class SqliteItemShopsDatabase {
         return DriverManager.getConnection(jdbcUrl);
     }
 
-    private boolean tableEmpty(String table, String sql) {
+    private boolean tableEmpty(Table table) {
         try (Connection connection = open();
-             PreparedStatement statement = connection.prepareStatement(sql);
+             PreparedStatement statement = connection.prepareStatement(table.emptyCheckSql());
              ResultSet resultSet = statement.executeQuery()) {
             return !resultSet.next();
         } catch (SQLException exception) {
-            plugin.getLogger().log(Level.WARNING, "Failed checking SQLite table state for " + table + ".", exception);
+            plugin.getLogger().log(Level.WARNING, "Failed checking SQLite table state for " + table.logName() + ".", exception);
             return false;
+        }
+    }
+
+    private enum Table {
+        SHOPS("shops", "SELECT 1 FROM shops LIMIT 1"),
+        VAULT_ENTRIES("vault_entries", "SELECT 1 FROM vault_entries LIMIT 1");
+
+        private final String logName;
+        private final String emptyCheckSql;
+
+        Table(String logName, String emptyCheckSql) {
+            this.logName = logName;
+            this.emptyCheckSql = emptyCheckSql;
+        }
+
+        private String logName() {
+            return logName;
+        }
+
+        private String emptyCheckSql() {
+            return emptyCheckSql;
         }
     }
 
