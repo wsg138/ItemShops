@@ -14,6 +14,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.io.IOException;
+import java.util.Arrays;
 
 public final class MarketCommand implements CommandExecutor, TabCompleter {
     private final ItemShopsPlugin plugin;
@@ -32,8 +34,10 @@ public final class MarketCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        MarketRegionManager mr = plugin.market();
+        MarketRegionManager mr = plugin.market();
         String sub = args[0].toLowerCase(Locale.ROOT);
+
+        if ("sync".equals(sub)) return handleSync(sender, args);
 
         switch (sub) {
             case "set" -> {
@@ -94,10 +98,83 @@ public final class MarketCommand implements CommandExecutor, TabCompleter {
             }
         }
     }
+
+    private boolean handleSync(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("itemshops.market.sync")) {
+            sender.sendMessage(ItemUtils.colored("&cNo permission."));
+            return true;
+        }
+        if (plugin.websiteMarketSync() == null) {
+            sender.sendMessage(ItemUtils.colored("&cWebsite Market synchronization is unavailable."));
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(ItemUtils.colored("&eUsage: /shopmarket sync <status|test|full|enable|disable|retry|secret|clear-secret>"));
+            return true;
+        }
+        String action = args[1].toLowerCase(Locale.ROOT);
+        try {
+            switch (action) {
+                case "secret" -> {
+                    if (sender instanceof Player && !sender.hasPermission("itemshops.admin")) {
+                        sender.sendMessage(ItemUtils.colored("&cNo permission.")); return true;
+                    }
+                    if (args.length < 3) { sender.sendMessage(ItemUtils.colored("&eUsage: /shopmarket sync secret <value>")); return true; }
+                    String secret = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+                    plugin.websiteMarketSync().settings().setSecret(secret);
+                    plugin.websiteMarketSync().restartScheduling();
+                    sender.sendMessage(ItemUtils.colored("&aWebsite Market sync secret saved."));
+                }
+                case "clear-secret" -> {
+                    if (sender instanceof Player && !sender.hasPermission("itemshops.admin")) {
+                        sender.sendMessage(ItemUtils.colored("&cNo permission.")); return true;
+                    }
+                    if (args.length != 3 || !"confirm".equalsIgnoreCase(args[2])) {
+                        sender.sendMessage(ItemUtils.colored("&eUsage: /shopmarket sync clear-secret confirm")); return true;
+                    }
+                    plugin.websiteMarketSync().settings().setSecret("");
+                    plugin.websiteMarketSync().restartScheduling();
+                    sender.sendMessage(ItemUtils.colored("&aWebsite Market sync secret cleared."));
+                }
+                case "status" -> sendSyncStatus(sender);
+                case "test" -> plugin.websiteMarketSync().test(result -> sender.sendMessage(ItemUtils.colored((result.successful() ? "&a" : "&c") + result.message())));
+                case "full" -> plugin.websiteMarketSync().full(result -> sender.sendMessage(ItemUtils.colored((result.successful() ? "&a" : "&c") + result.message())));
+                case "enable" -> {
+                    plugin.websiteMarketSync().settings().setEnabled(true); plugin.websiteMarketSync().restartScheduling();
+                    sender.sendMessage(ItemUtils.colored("&aWebsite Market sync enabled."));
+                }
+                case "disable" -> {
+                    plugin.websiteMarketSync().settings().setEnabled(false); plugin.websiteMarketSync().restartScheduling();
+                    sender.sendMessage(ItemUtils.colored("&aWebsite Market sync disabled; pending outbox state was preserved."));
+                }
+                case "retry" -> { plugin.websiteMarketSync().retry(); sender.sendMessage(ItemUtils.colored("&aPending Website Market states queued for retry.")); }
+                default -> sender.sendMessage(ItemUtils.colored("&eUsage: /shopmarket sync <status|test|full|enable|disable|retry|secret|clear-secret>"));
+            }
+        } catch (IOException e) {
+            sender.sendMessage(ItemUtils.colored("&cCould not save Website Market settings."));
+        }
+        return true;
+    }
+
+    private void sendSyncStatus(CommandSender sender) {
+        var status = plugin.websiteMarketSync().status();
+        sender.sendMessage(ItemUtils.colored("&6Website Market sync"));
+        sender.sendMessage(ItemUtils.colored("&7Enabled: &f" + (status.enabled() ? "yes" : "no")));
+        sender.sendMessage(ItemUtils.colored("&7Secret configured: &f" + (status.secretConfigured() ? "yes" : "no")));
+        sender.sendMessage(ItemUtils.colored("&7Ownership provider available: &f" + (status.providerAvailable() ? "yes" : "no")));
+        sender.sendMessage(ItemUtils.colored("&7Last successful full sync: &f" + (status.lastFullSuccess() == null ? "never" : status.lastFullSuccess())));
+        sender.sendMessage(ItemUtils.colored("&7Last successful stall update: &f" + (status.lastStallSuccess() == null ? "never" : status.lastStallSuccess())));
+        sender.sendMessage(ItemUtils.colored("&7Pending outbox stalls: &f" + status.pendingCount()));
+        sender.sendMessage(ItemUtils.colored("&7Server epoch: &f" + status.shortEpoch()));
+        sender.sendMessage(ItemUtils.colored("&7Snapshot revision: &f" + status.snapshotRevision()));
+        sender.sendMessage(ItemUtils.colored("&7Last error: &f" + (status.lastSafeError() == null ? "none" : status.lastSafeError())));
+    }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) return List.of("set","add","clear","list");
+        if (args.length == 1) return List.of("set","add","clear","list","sync");
+        if (args.length == 2 && "sync".equalsIgnoreCase(args[0])) return List.of("status","test","full","enable","disable","retry","secret","clear-secret");
+        if (args.length == 3 && "sync".equalsIgnoreCase(args[0]) && "clear-secret".equalsIgnoreCase(args[1])) return List.of("confirm");
         if (args.length == 2 && "set".equalsIgnoreCase(args[0])) return List.of("16","32","48","64");
         if (args.length == 2 && "add".equalsIgnoreCase(args[0])) return new ArrayList<>(Bukkit.getWorlds().stream().map(w -> w.getName()).toList());
         return Collections.emptyList();

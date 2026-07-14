@@ -27,6 +27,9 @@ import dev.enthusia.itemshops.service.ShopRegistry;
 import dev.enthusia.itemshops.service.ShopSignService;
 import dev.enthusia.itemshops.service.ShopTradeService;
 import dev.enthusia.itemshops.util.PerformanceCounters;
+import dev.enthusia.itemshops.websync.UnavailableOwnershipProvider;
+import dev.enthusia.itemshops.websync.WebsiteMarketSyncService;
+import dev.enthusia.itemshops.websync.WebsiteSyncSettings;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -54,6 +57,7 @@ public class ItemShopsPlugin extends JavaPlugin {
     private ShopAuditService shopAuditService;
     private PerformanceCounters performanceCounters;
     private FileConfiguration messages;
+    private WebsiteMarketSyncService websiteMarketSync;
 
     private final Map<UUID, Long> breakDeleteExpiry = new ConcurrentHashMap<>();
     private final Set<UUID> adminViewEnabled = ConcurrentHashMap.newKeySet();
@@ -158,12 +162,17 @@ public class ItemShopsPlugin extends JavaPlugin {
         }
 
         shopManager.loadFromStorage();
+        initializeWebsiteMarketSync();
         hookPlanAnalytics();
         getLogger().info("ItemShops enabled. Loaded " + shopManager.size() + " shops.");
     }
 
     @Override
     public void onDisable() {
+        if (websiteMarketSync != null) {
+            websiteMarketSync.close();
+            websiteMarketSync = null;
+        }
         if (shopAuditService != null) {
             shopAuditService.stop();
         }
@@ -217,6 +226,8 @@ public class ItemShopsPlugin extends JavaPlugin {
         return pluginConfig;
     }
 
+    public WebsiteMarketSyncService websiteMarketSync() { return websiteMarketSync; }
+
     private void reloadCachedMessages() {
         YamlLoader.mergeDefaults(this, "messages.yml");
         messages = YamlConfiguration.loadConfiguration(new File(getDataFolder(), "messages.yml"));
@@ -231,6 +242,10 @@ public class ItemShopsPlugin extends JavaPlugin {
     }
 
     public void reloadAll() {
+        if (websiteMarketSync != null) {
+            websiteMarketSync.close();
+            websiteMarketSync = null;
+        }
         new ConfigMigrator(this).migrateStartupFiles();
         reloadConfig();
         if (pluginConfig != null) {
@@ -251,6 +266,7 @@ public class ItemShopsPlugin extends JavaPlugin {
         if (marketManager != null) {
             marketManager.reload();
         }
+        initializeWebsiteMarketSync();
 
         shopManager.startSignUpdateScheduler();
         if (shopAuditService != null) {
@@ -262,6 +278,16 @@ public class ItemShopsPlugin extends JavaPlugin {
 
         hookPlanAnalytics();
         getLogger().info("Reload complete. Shops: " + shopManager.size() + ".");
+    }
+
+    private void initializeWebsiteMarketSync() {
+        try {
+            WebsiteSyncSettings settings = new WebsiteSyncSettings(this);
+            websiteMarketSync = new WebsiteMarketSyncService(this, settings, new UnavailableOwnershipProvider());
+        } catch (Exception e) {
+            websiteMarketSync = null;
+            getLogger().warning("Website Market synchronization is unavailable: " + e.getClass().getSimpleName());
+        }
     }
 
     private void hookPlanAnalytics() {

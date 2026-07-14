@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>dev.enthusia</groupId>
     <artifactId>itemshops</artifactId>
-    <version>1.7.2</version>
+    <version>1.8.0</version>
     <name>ItemShops</name>
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
@@ -38,6 +38,11 @@
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.46.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.11.0</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

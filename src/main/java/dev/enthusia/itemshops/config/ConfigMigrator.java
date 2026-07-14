@@ -17,6 +17,7 @@ import java.util.List;
 public final class ConfigMigrator {
     public static final int CONFIG_VERSION = 2;
     public static final int MESSAGES_VERSION = 1;
+    public static final int WEBSITE_SYNC_VERSION = 1;
 
     private static final DateTimeFormatter BACKUP_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
@@ -29,6 +30,7 @@ public final class ConfigMigrator {
     public void migrateStartupFiles() {
         migrateYaml("config.yml", CONFIG_VERSION, "config-version");
         migrateYaml("messages.yml", MESSAGES_VERSION, "messages-version");
+        migrateYaml("website-sync.yml", WEBSITE_SYNC_VERSION, "config-version");
     }
 
     private void migrateYaml(String name, int currentVersion, String versionPath) {
@@ -61,7 +63,7 @@ public final class ConfigMigrator {
             if (!added.isEmpty() || versionChanged) {
                 backup(target);
                 current.set(versionPath, currentVersion);
-                current.save(target);
+                atomicSave(current, target);
                 if (!added.isEmpty()) {
                     plugin.getLogger().info(name + " migration added missing keys: " + String.join(", ", added));
                 }
@@ -72,6 +74,16 @@ public final class ConfigMigrator {
         } catch (Exception e) {
             plugin.getLogger().warning("Could not safely migrate " + name + ": " + e.getMessage());
             plugin.getLogger().warning("Keeping existing " + name + ". Check the backup file if one was created.");
+        }
+    }
+
+    private void atomicSave(YamlConfiguration configuration, File target) throws IOException {
+        File temporary = new File(target.getParentFile(), target.getName() + ".tmp");
+        Files.writeString(temporary.toPath(), configuration.saveToString(), StandardCharsets.UTF_8);
+        try {
+            Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
+            Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
         }
     }
 

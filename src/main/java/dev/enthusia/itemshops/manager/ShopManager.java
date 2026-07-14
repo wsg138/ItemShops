@@ -104,6 +104,7 @@ public final class ShopManager {
         } else {
             plugin.performance().signRefreshCoalesced.increment();
         }
+        if (plugin.websiteMarketSync() != null) plugin.websiteMarketSync().markContainerDirty(container);
     }
 
     public void requestSignRefresh(Shop shop) {
@@ -205,6 +206,7 @@ public final class ShopManager {
         signService.updateSign(shop);
         storage.saveAsync(registry.all());
         Bukkit.getPluginManager().callEvent(new ShopCreatedEvent(shop, shop.owner()));
+        if (plugin.websiteMarketSync() != null) plugin.websiteMarketSync().markShopDirty(shop);
     }
 
     public Shop createShop(Sign sign, Block container, Player owner, org.bukkit.inventory.ItemStack sell, org.bukkit.inventory.ItemStack cost) {
@@ -228,6 +230,7 @@ public final class ShopManager {
     public void deleteShop(Shop shop, RemovalReason reason, UUID actor) {
         if (shop == null) return;
         if (!registry.remove(shop)) return;
+        if (plugin.websiteMarketSync() != null) plugin.websiteMarketSync().markShopDirty(shop);
         unindexShop(shop);
         cachedTradesAvailable.remove(shop.id());
         signService.clearSign(shop);
@@ -330,6 +333,13 @@ public final class ShopManager {
         return stock / Math.max(1, shop.sell().getAmount());
     }
 
+    public int currentStockCount(Shop shop) {
+        if (shop == null) return 0;
+        var location = shop.container().toLocation();
+        if (location == null || !(location.getBlock().getState() instanceof Container container)) return 0;
+        return ItemUtils.countSimilar(container.getInventory(), shop.sell());
+    }
+
     public int cachedTradesAvailable(Shop shop) {
         if (shop == null) return 0;
         Integer cached = cachedTradesAvailable.get(shop.id());
@@ -430,6 +440,7 @@ public final class ShopManager {
     public void setSearchEnabled(Shop shop, boolean enabled) {
         shop.setSearchEnabled(enabled);
         requestSave();
+        if (plugin.websiteMarketSync() != null) plugin.websiteMarketSync().markShopDirty(shop);
     }
 
     public void updateTradeItems(Shop shop, org.bukkit.inventory.ItemStack sell, org.bukkit.inventory.ItemStack cost) {
@@ -439,6 +450,7 @@ public final class ShopManager {
         refreshCachedTrades(shop);
         signService.updateSign(shop);
         requestSave();
+        if (plugin.websiteMarketSync() != null) plugin.websiteMarketSync().markShopDirty(shop);
     }
 
     public void freezeShop(Shop shop, long untilMs) {

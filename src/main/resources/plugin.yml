@@ -1,6 +1,6 @@
 name: ItemShops
 main: dev.enthusia.itemshops.ItemShopsPlugin
-version: 1.7.2
+version: 1.8.0
 api-version: '1.21'
 softdepend: [ARM-Guilds-Bridge, LumaGuilds, WorldGuard, Vault, Plan]
 author: Enthusia
@@ -19,7 +19,7 @@ commands:
 
   shopmarket:
     description: Manage ItemShops market regions
-    usage: /shopmarket set <radius> | add <world> <minX> <minY> <minZ> <maxX> <maxY> <maxZ> | clear | list
+    usage: /shopmarket set <radius> | add <world> <minX> <minY> <minZ> <maxX> <maxY> <maxZ> | clear | list | sync <status|test|full|enable|disable|retry|secret|clear-secret>
     permission: itemshops.market
 
   shophelp:
@@ -51,4 +51,6 @@ permissions:
   itemshops.vault:
     default: true
   itemshops.market:
+    default: op
+  itemshops.market.sync:
     default: op

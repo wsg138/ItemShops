@@ -1,0 +1,31 @@
+# ItemShops public website Market synchronization
+config-version: 1
+
+enabled: true
+endpoint: "https://market-api.enthusia.info"
+server-id: "enthusia-main"
+
+# Set from the server console with /shopmarket sync secret <value>.
+sync-secret: ""
+
+timing:
+  startup-delay-seconds: 30
+  stall-debounce-milliseconds: 250
+  reconciliation-minutes: 15
+
+http:
+  connect-timeout-seconds: 10
+  request-timeout-seconds: 15
+  maximum-concurrent-requests: 2
+
+retry:
+  initial-delay-seconds: 5
+  maximum-delay-seconds: 300
+  maximum-attempts-before-cooldown: 10
+
+outbox:
+  database-file: "website-sync-outbox.db"
+
+logging:
+  status-changes: true
+  successful-stall-updates: false
