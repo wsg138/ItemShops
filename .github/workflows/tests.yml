@@ -1,0 +1,54 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: itemshops-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact tested commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Record exact SHA
+        shell: bash
+        run: |
+          TESTED_SHA="$(git rev-parse HEAD)"
+          test -n "${TESTED_SHA}"
+          echo "TESTED_SHA=${TESTED_SHA}" >> "${GITHUB_ENV}"
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run Maven verification
+        run: mvn -B clean verify
+
+      - name: Confirm exact SHA did not change
+        shell: bash
+        run: test "${TESTED_SHA}" = "$(git rev-parse HEAD)"
+
+      - name: Upload Surefire reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: itemshops-surefire-${{ github.run_id }}
+          path: target/surefire-reports
+          if-no-files-found: warn
+          retention-days: 14
